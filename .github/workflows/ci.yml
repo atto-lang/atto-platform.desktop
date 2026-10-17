@@ -46,3 +46,18 @@ jobs:
       - run: cmake -S . -B build -DBUILD_TESTING=ON -DORES_DESKTOP_WITH_SDL3=OFF
       - run: cmake --build build --config Release --parallel 2
       - run: ctest --test-dir build -C Release --output-on-failure
+
+  linux-sanitizers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: >
+          cmake -S . -B build-sanitize -DCMAKE_C_COMPILER=clang
+          -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DORES_DESKTOP_WITH_SDL3=OFF
+          -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+      - run: cmake --build build-sanitize --parallel 2
+      - run: ctest --test-dir build-sanitize --output-on-failure

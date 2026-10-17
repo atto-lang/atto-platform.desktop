@@ -7,7 +7,10 @@
 } } while (0)
 
 typedef struct {
-    int scenario, opens, closes, starts, stops, polls, events, frames, presents;
+    int scenario, opens, closes, starts, stops, polls, events, frames, presents, alternate_presents;
+    ores_desktop_config *live_config;
+    ores_desktop_app *live_app;
+    ores_desktop_backend *live_backend;
 } fixture;
 static ores_desktop_status opened(void *p,const ores_desktop_config *c) {
     fixture *f=(fixture*)p;
@@ -34,10 +37,19 @@ static ores_desktop_status presented(void *p) {
     ++f->presents;
     return f->scenario==9 ? ORES_DESKTOP_BACKEND_ERROR : ORES_DESKTOP_OK;
 }
+static ores_desktop_status alternate_presented(void *p) {
+    ++((fixture*)p)->alternate_presents;
+    return ORES_DESKTOP_OK;
+}
 static void closed(void *p) { ++((fixture*)p)->closes; }
 static ores_desktop_status started(void *p) {
     fixture *f=(fixture*)p;
     ++f->starts;
+    if (f->scenario==12) {
+        f->live_config->frame_limit=1;
+        f->live_app->on_frame=NULL;
+        f->live_backend->present=alternate_presented;
+    }
     return f->scenario==7 ? ORES_DESKTOP_APP_ERROR :
            f->scenario==10 ? ORES_DESKTOP_STOP : ORES_DESKTOP_OK;
 }
@@ -61,6 +73,7 @@ static void run_scenario(int scenario,int expected_status,int frames,int events,
     ores_desktop_app a={0};
     ores_desktop_backend b={0};
     f.scenario=scenario;
+    f.live_config=&c; f.live_app=&a; f.live_backend=&b;
     a.context=&f; a.on_start=started; a.on_event=event_cb;
     a.on_frame=frame_cb; a.on_stop=stopped;
     b.context=&f; b.open=opened; b.poll=polled;
@@ -73,6 +86,7 @@ static void run_scenario(int scenario,int expected_status,int frames,int events,
     CHECK(f.presents==presented_frames);
     CHECK(f.stops==stopped_calls);
     CHECK(f.closes==closed_calls);
+    CHECK(f.alternate_presents==0);
 }
 static void bad_arguments(void) {
     fixture f={0};
@@ -118,6 +132,7 @@ int main(void) {
     run_scenario(9,ORES_DESKTOP_BACKEND_ERROR,1,0,1,1,1);
     run_scenario(10,ORES_DESKTOP_OK,0,0,0,1,1);
     run_scenario(11,ORES_DESKTOP_OK,0,1,0,1,1);
+    run_scenario(12,ORES_DESKTOP_OK,3,0,3,1,1);
     puts("desktop host ABI/lifecycle contract: PASS");
     return 0;
 }

@@ -15,6 +15,9 @@ typedef struct {
 static ores_desktop_status opened(void *p,const ores_desktop_config *c) {
     fixture *f=(fixture*)p;
     CHECK(c->abi_version==ORES_DESKTOP_ABI_VERSION);
+    CHECK(f->live_config != NULL);
+    CHECK(c->title != f->live_config->title);
+    CHECK(strcmp(c->title,f->live_config->title)==0);
     ++f->opens;
     return f->scenario==8 ? ORES_DESKTOP_BACKEND_ERROR : ORES_DESKTOP_OK;
 }

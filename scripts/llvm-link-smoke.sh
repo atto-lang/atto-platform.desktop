@@ -11,7 +11,7 @@ clang_bin="clang"
 command -v "$clang_bin" >/dev/null || { echo "Clang required." >&2; exit 69; }
 work="$(mktemp -d)"
 trap 'rm -rf -- "$work"' EXIT
-"$compiler" --target=host "$root/examples/guest_config.ores" > "$work/guest.ll"
+"$compiler" --tree-shake --target=host "$root/examples/guest_config.ores" > "$work/guest.ll"\nif grep -q '@desktop_unreachable_probe(' "$work/guest.ll"; then\n  echo "tree shaking retained unreachable desktop guest symbol" >&2\n  exit 1\nfi
 "$clang_bin" -x ir -c "$work/guest.ll" -o "$work/guest.o"
 "$clang_bin" -std=c11 -Wall -Wextra -Wpedantic -Werror \
   -I"$root/include" "$root/src/ores_desktop.c" \

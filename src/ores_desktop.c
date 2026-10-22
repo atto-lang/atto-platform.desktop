@@ -56,6 +56,7 @@ ores_desktop_status ores_desktop_run(const ores_desktop_config *c,
         uint32_t i;
         for (i=0; i<max_events; ++i) {
             ores_desktop_event e={0,0,0,0};
+            uint32_t polled_type;
             int available=-1;
             ores_desktop_status s=backend.poll(backend.context,&e,&available);
             if (s!=ORES_DESKTOP_OK || (available!=0 && available!=1)) {
@@ -65,12 +66,15 @@ ores_desktop_status ores_desktop_run(const ores_desktop_config *c,
             if (e.type<ORES_DESKTOP_QUIT || e.type>ORES_DESKTOP_POINTER_UP) {
                 outcome=ORES_DESKTOP_BACKEND_ERROR; goto cleanup;
             }
+            /* Do not let a callback's cast-away-const write change whether
+             * the host honors an already validated quit event. */
+            polled_type=e.type;
             if (app.on_event) {
                 s=app.on_event(app.context,&e);
                 if (!valid_status(s)) { outcome=ORES_DESKTOP_APP_ERROR; goto cleanup; }
                 if (s==ORES_DESKTOP_STOP) goto cleanup;
             }
-            if (e.type==ORES_DESKTOP_QUIT) goto cleanup;
+            if (polled_type==ORES_DESKTOP_QUIT) goto cleanup;
         }
         if (app.on_frame) {
             ores_desktop_status s=app.on_frame(app.context,frame);

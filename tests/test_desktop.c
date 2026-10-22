@@ -73,7 +73,7 @@ static ores_desktop_status frame_cb(void *p,uint64_t frame) {
     return f->scenario==6 ? ORES_DESKTOP_APP_ERROR : ORES_DESKTOP_OK;
 }
 static void stopped(void *p) { ++((fixture*)p)->stops; }
-static void run_scenario(int scenario,int expected_status,int frames,int events,
+static void run_scenario(int scenario,ores_desktop_status expected_status,int frames,int events,
                          int presented_frames,int stopped_calls,int closed_calls) {
     fixture f={0};
     ores_desktop_config c={ORES_DESKTOP_ABI_VERSION,800,600,2,3,"Desktop test"};

@@ -27,7 +27,9 @@ typedef struct {
     uint64_t frame_limit; /* 0 means unbounded */
     const char *title;    /* borrowed, NUL terminated, <=127 bytes */
 } ores_desktop_config;
-/* Borrowed callback event pointer expires on return. Return OK or STOP only. */
+/* Borrowed callback event pointer expires on return. Return OK or STOP only.
+ * The host honors the original polled QUIT event even if callback code
+ * improperly casts away const and mutates the event object. */
 typedef struct {
     void *context;
     ores_desktop_status (*on_start)(void *);

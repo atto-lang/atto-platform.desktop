@@ -28,9 +28,9 @@ static ores_desktop_status polled(void *p,ores_desktop_event *e,int *available) 
     if (f->scenario==3) { *available=2; return ORES_DESKTOP_OK; }
     if (f->scenario==4) return ORES_DESKTOP_BACKEND_ERROR;
     if (f->scenario==1 || f->scenario==2 ||
-        f->scenario==5 || f->scenario==11) {
+        f->scenario==5 || f->scenario==11 || f->scenario==13) {
         *available=1;
-        e->type=f->scenario==1 ? ORES_DESKTOP_QUIT :
+        e->type=(f->scenario==1 || f->scenario==13) ? ORES_DESKTOP_QUIT :
             f->scenario==5 ? 1000 : ORES_DESKTOP_KEY_DOWN;
     }
     return ORES_DESKTOP_OK;
@@ -60,6 +60,10 @@ static ores_desktop_status event_cb(void *p,const ores_desktop_event *e) {
     fixture *f=(fixture*)p;
     CHECK(e->type>=ORES_DESKTOP_QUIT && e->type<=ORES_DESKTOP_POINTER_UP);
     ++f->events;
+    if (f->scenario==13) {
+        /* Adversarial callback must not suppress an already-polled quit. */
+        ((ores_desktop_event *)(void *)e)->type=ORES_DESKTOP_KEY_DOWN;
+    }
     return f->scenario==11 ? ORES_DESKTOP_STOP : ORES_DESKTOP_OK;
 }
 static ores_desktop_status frame_cb(void *p,uint64_t frame) {
@@ -136,6 +140,7 @@ int main(void) {
     run_scenario(10,ORES_DESKTOP_OK,0,0,0,1,1);
     run_scenario(11,ORES_DESKTOP_OK,0,1,0,1,1);
     run_scenario(12,ORES_DESKTOP_OK,3,0,3,1,1);
+    run_scenario(13,ORES_DESKTOP_OK,0,1,0,1,1);
     puts("desktop host ABI/lifecycle contract: PASS");
     return 0;
 }

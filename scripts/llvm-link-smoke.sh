@@ -2,8 +2,12 @@
 # Link real Oreslang LLVM host scalar exports with a native C desktop host.
 set -euo pipefail
 umask 077
-if [ "$#" -lt 1 ] || [ "$#" -gt 2 ] || [ ! -x "$1" ]; then
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
   echo "Usage: bash scripts/llvm-link-smoke.sh /path/to/oreslang-llvmc [expected-sha256]" >&2
+  exit 64
+fi
+if [ ! -f "$1" ] || [ -L "$1" ] || [ ! -x "$1" ]; then
+  echo "Compiler path must be an executable regular file and not a symlink" >&2
   exit 64
 fi
 root="$(cd "$(dirname "$0")/.." && pwd -P)"
@@ -44,12 +48,19 @@ printf 'ORES_DESKTOP_COMPILER_SHA256=%s\n' "$pinned_sha256"
   --tree-shake-root=desktop_next_frame \
   --target=host "$root/examples/guest_config.ores" > "$work/guest.ll"
 
-for symbol in desktop_initial_width desktop_initial_height desktop_next_frame; do
-  if ! grep -Eq "^define[[:space:]].*@\"?${symbol}\"?\\(" "$work/guest.ll"; then
-    echo "tree shaking omitted required desktop guest symbol: $symbol" >&2
+require_i64_signature() {
+  local symbol="$1"
+  local args_regex="$2"
+  local count
+  count="$(grep -Ec "^define[[:space:]].*i64[[:space:]]+@\"?${symbol}\"?\\(${args_regex}\\)" "$work/guest.ll" || true)"
+  if [ "$count" -ne 1 ]; then
+    echo "desktop guest symbol has missing/duplicate/wrong i64 ABI: $symbol" >&2
     exit 1
   fi
-done
+}
+require_i64_signature desktop_initial_width ""
+require_i64_signature desktop_initial_height ""
+require_i64_signature desktop_next_frame "i64[^,)]*"
 if grep -Eq '@"?desktop_unreachable_probe"?\(' "$work/guest.ll"; then
   echo "tree shaking retained unreachable desktop guest symbol" >&2
   exit 1

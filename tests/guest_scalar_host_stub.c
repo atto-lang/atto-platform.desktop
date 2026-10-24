@@ -10,4 +10,11 @@ int64_t desktop_next_frame(int64_t frame) {
 #endif
 }
 int64_t desktop_initial_width(void) { return 800; }
-int64_t desktop_initial_height(void) { return desktop_next_frame(499); }
+int64_t desktop_initial_height(void) {
+#ifdef ORES_DESKTOP_TEST_MALFORMED_SCALAR
+    /* Keep host config valid so only the frame transition is malformed. */
+    return 500;
+#else
+    return desktop_next_frame(499);
+#endif
+}

@@ -32,6 +32,16 @@ require_rejection(missing "" "${bad_digest}" "needs ORES_DESKTOP_LLVMC")
 require_rejection(relative "relative/oreslang-llvmc" "${bad_digest}" "must name an existing absolute file")
 require_rejection(nonexistent_absolute "${ORES_DESKTOP_TEST_ROOT}/compiler-not-installed"
   "${bad_digest}" "must name an existing absolute file")
+if(UNIX)
+  set(compiler_link "${ORES_DESKTOP_TEST_ROOT}/compiler-symlink")
+  file(REMOVE "${compiler_link}")
+  file(CREATE_LINK "${CMAKE_COMMAND}" "${compiler_link}" SYMBOLIC RESULT link_result)
+  if(NOT "${link_result}" STREQUAL "0")
+    message(FATAL_ERROR "could not create compiler symlink regression fixture: ${link_result}")
+  endif()
+  require_rejection(symlink "${compiler_link}" "${bad_digest}"
+    "must name an existing absolute file")
+endif()
 require_rejection(missing_digest "${CMAKE_COMMAND}" "" "requires ORES_DESKTOP_LLVMC_SHA256")
 require_rejection(wrong_digest "${CMAKE_COMMAND}" "${bad_digest}"
   "ORES_DESKTOP_LLVMC_SHA256 disagrees")

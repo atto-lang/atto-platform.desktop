@@ -4,6 +4,7 @@
 /* Plain i64 symbols exported by the current LLVM native scalar compiler. */
 extern int64_t desktop_initial_width(void);
 extern int64_t desktop_initial_height(void);
+extern int64_t desktop_next_frame(int64_t frame);
 typedef struct {
     int opens, closes, presents;
 } state;

@@ -43,8 +43,20 @@ int main(void) {
     a.on_frame=frame;
     b.context=&s; b.open=opened; b.poll=polled;
     b.present=presented; b.close=closed;
-    if (ores_desktop_run(&c,&a,&b)!=ORES_DESKTOP_OK ||
-        s.opens!=1 || s.presents!=2 || s.frames!=3 || s.closes!=1) return 3;
-    puts("LLVM guest i64 frame transitions -> native desktop callback: PASS (headless)");
+    {
+        ores_desktop_status result=ores_desktop_run(&c,&a,&b);
+#ifdef ORES_DESKTOP_TEST_MALFORMED_SCALAR
+        /* Reject an invalid guest result, but still close the host backend. */
+        if (result!=ORES_DESKTOP_APP_ERROR ||
+            s.opens!=1 || s.presents!=0 || s.frames!=0 || s.closes!=1)
+            return 3;
+        puts("Malformed guest scalar rejected with cleanup: PASS (host stub)");
+#else
+        if (result!=ORES_DESKTOP_OK ||
+            s.opens!=1 || s.presents!=2 || s.frames!=3 || s.closes!=1)
+            return 3;
+        puts("LLVM guest i64 frame transitions -> native desktop callback: PASS (headless)");
+#endif
+    }
     return 0;
 }

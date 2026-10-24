@@ -1,12 +1,22 @@
 #!/usr/bin/env bash
 # Link real Oreslang LLVM host scalar exports with a native C desktop host.
 set -euo pipefail
-if [ "$#" -ne 1 ] || [ ! -x "$1" ]; then
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ] || [ ! -x "$1" ]; then
   echo "Usage: bash scripts/llvm-link-smoke.sh /path/to/oreslang-llvmc" >&2
   exit 64
 fi
 root="$(cd "$(dirname "$0")/.." && pwd -P)"
 compiler="$1"
+expected_sha256="${2:-}"
+if [ -n "$expected_sha256" ]; then
+  command -v cmake >/dev/null || { echo "CMake required for compiler SHA-256 verification." >&2; exit 69; }
+  actual_sha256="$(cmake -E sha256sum "$compiler")"
+  actual_sha256="${actual_sha256%% *}"
+  if [ "$actual_sha256" != "$expected_sha256" ]; then
+    echo "Compiler SHA-256 changed before guest execution" >&2
+    exit 65
+  fi
+fi
 clang_bin="clang"
 command -v "$clang_bin" >/dev/null || { echo "Clang required." >&2; exit 69; }
 work="$(mktemp -d)"

@@ -1,6 +1,6 @@
 // Compilable scalar subset of oreslang-source.llvm. No guest main or host imports.
 // One scalar function is used both internally and by a native desktop callback.
-pub fnc desktop_next_frame(frame: int): int {
+pub fnc desktop_next_frame(int frame): int {
     return frame + 1;
 }
 

@@ -25,8 +25,10 @@ endif()
 if(ORES_DESKTOP_LLVMC)
   if(NOT IS_ABSOLUTE "${ORES_DESKTOP_LLVMC}" OR
      NOT EXISTS "${ORES_DESKTOP_LLVMC}" OR
-     IS_DIRECTORY "${ORES_DESKTOP_LLVMC}")
-    message(FATAL_ERROR "ORES_DESKTOP_LLVMC must name an existing absolute file")
+     IS_DIRECTORY "${ORES_DESKTOP_LLVMC}" OR
+     IS_SYMLINK "${ORES_DESKTOP_LLVMC}")
+    message(FATAL_ERROR
+      "ORES_DESKTOP_LLVMC must name an existing absolute file that is not a symlink")
   endif()
   if(ORES_DESKTOP_LLVMC_SHA256)
     string(TOLOWER "${ORES_DESKTOP_LLVMC_SHA256}" expected_compiler_sha256)

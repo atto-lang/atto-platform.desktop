@@ -35,4 +35,6 @@ require_rejection(nonexistent_absolute "${ORES_DESKTOP_TEST_ROOT}/compiler-not-i
 require_rejection(missing_digest "${CMAKE_COMMAND}" "" "requires ORES_DESKTOP_LLVMC_SHA256")
 require_rejection(wrong_digest "${CMAKE_COMMAND}" "${bad_digest}"
   "ORES_DESKTOP_LLVMC_SHA256 disagrees")
+require_rejection(malformed_digest "${CMAKE_COMMAND}" "not-a-digest"
+  "ORES_DESKTOP_LLVMC_SHA256 must be 64 hexadecimal digits")
 message(STATUS "Real LLVM guest compiler admission: negative tests passed")

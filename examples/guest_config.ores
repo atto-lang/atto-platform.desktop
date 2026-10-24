@@ -3,7 +3,7 @@ pub fnc desktop_initial_width(): int {
     return 800;
 }
 pub fnc desktop_initial_height(): int {
-    return 500;
+    return desktop_next_frame(499);
 }
 
 // A guest-defined scalar frame transition; native desktop callbacks invoke

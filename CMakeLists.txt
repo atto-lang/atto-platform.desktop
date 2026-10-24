@@ -51,6 +51,12 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     set_tests_properties(desktop_real_llvm_guest_link PROPERTIES
       TIMEOUT 120 LABELS "real-guest;compiler-required")
   endif()
+  add_test(NAME desktop_guest_compiler_admission_negative
+    COMMAND "${CMAKE_COMMAND}"
+      "-DORES_DESKTOP_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+      "-DORES_DESKTOP_TEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/guest-admission-negative"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/guest_compiler_admission.cmake")
+  set_tests_properties(desktop_guest_compiler_admission_negative PROPERTIES TIMEOUT 30)
   add_executable(test_desktop tests/test_desktop.c)
   target_link_libraries(test_desktop PRIVATE ores_desktop)
   add_test(NAME desktop_host_abi_lifecycle COMMAND test_desktop)

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Link real Oreslang LLVM host scalar exports with a native C desktop host.
 set -euo pipefail
+umask 077
 if [ "$#" -lt 1 ] || [ "$#" -gt 2 ] || [ ! -x "$1" ]; then
   echo "Usage: bash scripts/llvm-link-smoke.sh /path/to/oreslang-llvmc [expected-sha256]" >&2
   exit 64
@@ -26,7 +27,7 @@ trap 'rm -rf -- "$work"' EXIT
   --tree-shake-root=desktop_initial_height \
   --tree-shake-root=desktop_next_frame \
   --target=host "$root/examples/guest_config.ores" > "$work/guest.ll"
-if grep -q '@desktop_unreachable_probe(' "$work/guest.ll"; then
+if grep -Eq '@"?desktop_unreachable_probe"?\(' "$work/guest.ll"; then
   echo "tree shaking retained unreachable desktop guest symbol" >&2
   exit 1
 fi

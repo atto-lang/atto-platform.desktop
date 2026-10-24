@@ -64,7 +64,7 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     add_test(NAME desktop_real_llvm_guest_link
       COMMAND "${ORES_DESKTOP_BASH}"
         "${CMAKE_CURRENT_SOURCE_DIR}/scripts/llvm-link-smoke.sh"
-        "${ORES_DESKTOP_LLVMC}" "${ORES_DESKTOP_LLVMC_SHA256}")
+        "${ORES_DESKTOP_LLVMC}" "${expected_compiler_sha256}")
     set_tests_properties(desktop_real_llvm_guest_link PROPERTIES
       TIMEOUT 120 LABELS "real-guest;compiler-required")
   endif()

@@ -34,5 +34,5 @@ require_rejection(nonexistent_absolute "${ORES_DESKTOP_TEST_ROOT}/compiler-not-i
   "${bad_digest}" "must name an existing absolute file")
 require_rejection(missing_digest "${CMAKE_COMMAND}" "" "requires ORES_DESKTOP_LLVMC_SHA256")
 require_rejection(wrong_digest "${CMAKE_COMMAND}" "${bad_digest}"
-  "ORE[S]_DESKTOP_LLVMC_SHA256 disagrees")
+  "ORES_DESKTOP_LLVMC_SHA256 disagrees")
 message(STATUS "Real LLVM guest compiler admission: negative tests passed")

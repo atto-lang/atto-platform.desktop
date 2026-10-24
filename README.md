@@ -40,6 +40,25 @@ After building oreslang-source.llvm, run:
 
 The smoke uses examples/guest_config.ores, compiles it to LLVM IR, links it with examples/llvm_host_bridge.c and the desktop C host, and executes an OS-native headless binary. It requires Clang at build time, not at runtime. It intentionally fails when the compiler or target ABI cannot link; no interpreter fallback.
 
+On an authorized native Unix runner with a separately built, provenance-checked LLVM compiler,
+make real source execution mandatory:
+
+~~~sh
+cmake -S . -B build-guest -DBUILD_TESTING=ON \
+  -DORES_DESKTOP_REQUIRE_LLVM_GUEST=ON \
+  -DORES_DESKTOP_LLVMC=/absolute/path/to/oreslang-llvmc
+cmake --build build-guest
+ctest --test-dir build-guest --output-on-failure
+~~~
+
+The CTest named `desktop_real_llvm_guest_link` runs the source-based
+`llvm-link-smoke.sh`. Configuration fails closed with no compiler,
+an invalid compiler path or a non-native/Windows runner. Without an LLVM
+compiler, the other `desktop_guest_scalar_*` CTests exercise **host-only
+C ABI stubs**, including a malformed frame result rejected with cleanup.
+Neither stub proves Oreslang compilation or actor/UI guest parity.
+
+
 ## Design
 
 - Oreslang LLVM: source verification, native IR, AOT objects. It owns guest calling conventions and future host imports.

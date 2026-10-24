@@ -37,4 +37,9 @@ require_rejection(wrong_digest "${CMAKE_COMMAND}" "${bad_digest}"
   "ORES_DESKTOP_LLVMC_SHA256 disagrees")
 require_rejection(malformed_digest "${CMAKE_COMMAND}" "not-a-digest"
   "ORES_DESKTOP_LLVMC_SHA256 must be 64 hexadecimal digits")
+if(WIN32)
+  file(SHA256 "${CMAKE_COMMAND}" cmake_command_sha256)
+  require_rejection(windows_platform "${CMAKE_COMMAND}" "${cmake_command_sha256}"
+    "LLVM guest smoke currently needs a native Unix CTest runner")
+endif()
 message(STATUS "Real LLVM guest compiler admission: negative tests passed")

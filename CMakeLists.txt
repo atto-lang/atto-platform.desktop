@@ -38,7 +38,7 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
   add_test(NAME desktop_guest_scalar_reject_invalid
     COMMAND test_desktop_guest_scalar_reject)
   set_tests_properties(desktop_guest_scalar_reject_invalid
-    PROPERTIES TIMEOUT 10 WILL_FAIL TRUE)
+    PROPERTIES TIMEOUT 10)
   foreach(contract_test test_desktop test_desktop_burst test_desktop_guest_scalar_host test_desktop_guest_scalar_reject)
     if(MSVC)
       target_compile_options(${contract_test} PRIVATE /W4 /WX)

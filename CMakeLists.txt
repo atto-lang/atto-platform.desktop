@@ -30,7 +30,16 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
   target_link_libraries(test_desktop_guest_scalar_host PRIVATE ores_desktop)
   add_test(NAME desktop_guest_scalar_host_stub COMMAND test_desktop_guest_scalar_host)
   set_tests_properties(desktop_guest_scalar_host_stub PROPERTIES TIMEOUT 10)
-  foreach(contract_test test_desktop test_desktop_burst test_desktop_guest_scalar_host)
+  add_executable(test_desktop_guest_scalar_reject
+    examples/llvm_host_bridge.c tests/guest_scalar_host_stub.c)
+  target_link_libraries(test_desktop_guest_scalar_reject PRIVATE ores_desktop)
+  target_compile_definitions(test_desktop_guest_scalar_reject
+    PRIVATE ORES_DESKTOP_TEST_MALFORMED_SCALAR)
+  add_test(NAME desktop_guest_scalar_reject_invalid
+    COMMAND test_desktop_guest_scalar_reject)
+  set_tests_properties(desktop_guest_scalar_reject_invalid
+    PROPERTIES TIMEOUT 10 WILL_FAIL TRUE)
+  foreach(contract_test test_desktop test_desktop_burst test_desktop_guest_scalar_host test_desktop_guest_scalar_reject)
     if(MSVC)
       target_compile_options(${contract_test} PRIVATE /W4 /WX)
     else()

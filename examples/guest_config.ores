@@ -1,15 +1,15 @@
 // Compilable scalar subset of oreslang-source.llvm. No guest main or host imports.
+// One scalar function is used both internally and by a native desktop callback.
+pub fnc desktop_next_frame(frame: int): int {
+    return frame + 1;
+}
+
 pub fnc desktop_initial_width(): int {
     return 800;
 }
+
 pub fnc desktop_initial_height(): int {
     return desktop_next_frame(499);
-}
-
-// A guest-defined scalar frame transition; native desktop callbacks invoke
-// this compiled Oreslang function synchronously through the i64 C ABI.
-pub fnc desktop_next_frame(frame: int): int {
-    return frame + 1;
 }
 
 fnc desktop_unreachable_probe(): int {

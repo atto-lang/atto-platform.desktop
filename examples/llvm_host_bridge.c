@@ -39,6 +39,7 @@ int main(void) {
     ores_desktop_backend b={0};
     if (w<1 || w>16384 || h<1 || h>16384) return 2;
     c.width=(uint32_t)w; c.height=(uint32_t)h;
+    a.context=&s;
     a.on_frame=frame;
     b.context=&s; b.open=opened; b.poll=polled;
     b.present=presented; b.close=closed;

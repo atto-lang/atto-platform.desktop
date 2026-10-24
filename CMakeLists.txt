@@ -6,6 +6,8 @@ option(ORES_DESKTOP_REQUIRE_LLVM_GUEST
   "Require an independently supplied LLVM compiler for source-to-native guest smoke" OFF)
 set(ORES_DESKTOP_LLVMC "" CACHE FILEPATH
   "Absolute path to an independently built and provenance-checked oreslang-llvmc")
+set(ORES_DESKTOP_LLVMC_SHA256 "" CACHE STRING
+  "Expected SHA-256 digest of the independently built oreslang-llvmc")
 if(ORES_DESKTOP_REQUIRE_LLVM_GUEST AND (NOT BUILD_TESTING OR CMAKE_CROSSCOMPILING))
   message(FATAL_ERROR
     "Required LLVM guest integration must be a native executable CTest build")
@@ -13,6 +15,9 @@ endif()
 if(ORES_DESKTOP_REQUIRE_LLVM_GUEST AND NOT ORES_DESKTOP_LLVMC)
   message(FATAL_ERROR
     "ORES_DESKTOP_REQUIRE_LLVM_GUEST=ON needs ORES_DESKTOP_LLVMC")
+endif()
+if(ORES_DESKTOP_REQUIRE_LLVM_GUEST AND NOT ORES_DESKTOP_LLVMC_SHA256)
+  message(FATAL_ERROR "Real guest execution requires ORES_DESKTOP_LLVMC_SHA256")
 endif()
 if(ORES_DESKTOP_LLVMC)
   if(NOT IS_ABSOLUTE "${ORES_DESKTOP_LLVMC}" OR
@@ -22,6 +27,18 @@ if(ORES_DESKTOP_LLVMC)
   endif()
   if(WIN32 OR CMAKE_CROSSCOMPILING OR NOT BUILD_TESTING)
     message(FATAL_ERROR "LLVM guest smoke currently needs a native Unix CTest runner")
+  endif()
+  if(ORES_DESKTOP_LLVMC_SHA256)
+    string(TOLOWER "${ORES_DESKTOP_LLVMC_SHA256}" expected_compiler_sha256)
+    string(LENGTH "${expected_compiler_sha256}" expected_sha256_length)
+    if(NOT expected_sha256_length EQUAL 64 OR
+       NOT expected_compiler_sha256 MATCHES "^[0-9a-f]+$")
+      message(FATAL_ERROR "ORES_DESKTOP_LLVMC_SHA256 must be 64 hexadecimal digits")
+    endif()
+    file(SHA256 "${ORES_DESKTOP_LLVMC}" actual_compiler_sha256)
+    if(NOT actual_compiler_sha256 STREQUAL expected_compiler_sha256)
+      message(FATAL_ERROR "ORES_DESKTOP_LLVMC_SHA256 disagrees with the binary at the configured path")
+    endif()
   endif()
   find_program(ORES_DESKTOP_BASH bash REQUIRED)
   find_program(ORES_DESKTOP_CLANG clang REQUIRED)
@@ -47,7 +64,7 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     add_test(NAME desktop_real_llvm_guest_link
       COMMAND "${ORES_DESKTOP_BASH}"
         "${CMAKE_CURRENT_SOURCE_DIR}/scripts/llvm-link-smoke.sh"
-        "${ORES_DESKTOP_LLVMC}")
+        "${ORES_DESKTOP_LLVMC}" "${ORES_DESKTOP_LLVMC_SHA256}")
     set_tests_properties(desktop_real_llvm_guest_link PROPERTIES
       TIMEOUT 120 LABELS "real-guest;compiler-required")
   endif()

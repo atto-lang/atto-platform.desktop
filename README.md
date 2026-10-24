@@ -44,16 +44,23 @@ On an authorized native Unix runner with a separately built, provenance-checked 
 make real source execution mandatory:
 
 ~~~sh
+# Digest comes from an independently audited compiler build.
+cmake -E sha256sum /absolute/path/to/oreslang-llvmc
 cmake -S . -B build-guest -DBUILD_TESTING=ON \
   -DORES_DESKTOP_REQUIRE_LLVM_GUEST=ON \
-  -DORES_DESKTOP_LLVMC=/absolute/path/to/oreslang-llvmc
+  -DORES_DESKTOP_LLVMC=/absolute/path/to/oreslang-llvmc \
+  -DORES_DESKTOP_LLVMC_SHA256=FULL_EXPECTED_64_HEX_DIGEST
 cmake --build build-guest
 ctest --test-dir build-guest --output-on-failure
 ~~~
 
 The CTest named `desktop_real_llvm_guest_link` runs the source-based
 `llvm-link-smoke.sh`. Configuration fails closed with no compiler,
-an invalid compiler path or a non-native/Windows runner. Without an LLVM
+an invalid compiler path, absent/mismatched SHA-256 or a non-native/Windows runner.
+The file digest is checked at CMake configuration and again immediately before
+executing the source-to-IR compiler. This pins binary bytes only; it does
+**not** attest the compiler's relationship to a claimed source commit or
+replace an independently reviewed build provenance record. Without an LLVM
 compiler, the other `desktop_guest_scalar_*` CTests exercise **host-only
 C ABI stubs**, including a malformed frame result rejected with cleanup.
 Neither stub proves Oreslang compilation or actor/UI guest parity.

@@ -60,7 +60,7 @@ if(ORES_DESKTOP_WITH_SDL3)
   target_link_libraries(ores_desktop_demo PRIVATE ores_desktop_sdl3)
 endif()
 if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
-  if(ORES_DESKTOP_LLVMC)
+  if(ORES_DESKTOP_REQUIRE_LLVM_GUEST)
     add_test(NAME desktop_real_llvm_guest_link
       COMMAND "${ORES_DESKTOP_BASH}"
         "${CMAKE_CURRENT_SOURCE_DIR}/scripts/llvm-link-smoke.sh"

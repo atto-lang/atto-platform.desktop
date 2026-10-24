@@ -28,6 +28,10 @@ function(require_rejection case_name compiler_path digest diagnostic)
   endif()
 endfunction()
 set(bad_digest "0000000000000000000000000000000000000000000000000000000000000000")
+file(MAKE_DIRECTORY "${ORES_DESKTOP_TEST_ROOT}")
+set(compiler_fixture "${ORES_DESKTOP_TEST_ROOT}/compiler-regular-file")
+configure_file("${CMAKE_COMMAND}" "${compiler_fixture}" COPYONLY)
+file(SHA256 "${compiler_fixture}" compiler_fixture_sha256)
 require_rejection(missing "" "${bad_digest}" "needs ORES_DESKTOP_LLVMC")
 require_rejection(relative "relative/oreslang-llvmc" "${bad_digest}" "must name an existing absolute file")
 require_rejection(nonexistent_absolute "${ORES_DESKTOP_TEST_ROOT}/compiler-not-installed"
@@ -35,21 +39,20 @@ require_rejection(nonexistent_absolute "${ORES_DESKTOP_TEST_ROOT}/compiler-not-i
 if(UNIX)
   set(compiler_link "${ORES_DESKTOP_TEST_ROOT}/compiler-symlink")
   file(REMOVE "${compiler_link}")
-  file(CREATE_LINK "${CMAKE_COMMAND}" "${compiler_link}" SYMBOLIC RESULT link_result)
+  file(CREATE_LINK "${compiler_fixture}" "${compiler_link}" SYMBOLIC RESULT link_result)
   if(NOT "${link_result}" STREQUAL "0")
     message(FATAL_ERROR "could not create compiler symlink regression fixture: ${link_result}")
   endif()
   require_rejection(symlink "${compiler_link}" "${bad_digest}"
     "must name an existing absolute file")
 endif()
-require_rejection(missing_digest "${CMAKE_COMMAND}" "" "requires ORES_DESKTOP_LLVMC_SHA256")
-require_rejection(wrong_digest "${CMAKE_COMMAND}" "${bad_digest}"
+require_rejection(missing_digest "${compiler_fixture}" "" "requires ORES_DESKTOP_LLVMC_SHA256")
+require_rejection(wrong_digest "${compiler_fixture}" "${bad_digest}"
   "ORES_DESKTOP_LLVMC_SHA256 disagrees")
-require_rejection(malformed_digest "${CMAKE_COMMAND}" "not-a-digest"
+require_rejection(malformed_digest "${compiler_fixture}" "not-a-digest"
   "ORES_DESKTOP_LLVMC_SHA256 must be 64 hexadecimal digits")
 if(WIN32)
-  file(SHA256 "${CMAKE_COMMAND}" cmake_command_sha256)
-  require_rejection(windows_platform "${CMAKE_COMMAND}" "${cmake_command_sha256}"
+  require_rejection(windows_platform "${compiler_fixture}" "${compiler_fixture_sha256}"
     "LLVM guest smoke currently needs a native Unix CTest runner")
 endif()
 message(STATUS "Real LLVM guest compiler admission: negative tests passed")

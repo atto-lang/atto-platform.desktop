@@ -71,6 +71,17 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     set_tests_properties(desktop_real_llvm_guest_link PROPERTIES
       TIMEOUT 120 LABELS "real-guest;compiler-required")
   endif()
+  if(UNIX)
+    find_program(ORES_DESKTOP_TEST_BASH bash)
+    find_program(ORES_DESKTOP_TEST_CLANG clang)
+    if(ORES_DESKTOP_TEST_BASH AND ORES_DESKTOP_TEST_CLANG)
+      add_test(NAME desktop_llvm_link_smoke_guard
+        COMMAND "${ORES_DESKTOP_TEST_BASH}"
+          "${CMAKE_CURRENT_SOURCE_DIR}/tests/llvm_link_smoke_guard.sh")
+      set_tests_properties(desktop_llvm_link_smoke_guard PROPERTIES
+        TIMEOUT 60 LABELS "host-only;llvm-gate-regression")
+    endif()
+  endif()
   add_test(NAME desktop_guest_compiler_admission_negative
     COMMAND "${CMAKE_COMMAND}"
       "-DORES_DESKTOP_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"

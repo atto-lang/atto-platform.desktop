@@ -57,6 +57,15 @@ set -e
 test "$wrong_status" -eq 65
 grep -Fq 'Compiler SHA-256 changed before guest execution' <<<"$wrong_out"
 
+symlinked="$work/symlinked-compiler"
+ln -s "$good" "$symlinked"
+set +e
+symlink_out="$(bash "$smoke" "$symlinked" "$good_sha" 2>&1)"
+symlink_status=$?
+set -e
+test "$symlink_status" -eq 64
+grep -Fq 'Compiler path must be an executable regular file and not a symlink' <<<"$symlink_out"
+
 missing="$work/missing-compiler"
 cat > "$missing" <<'IR'
 #!/usr/bin/env bash
@@ -72,7 +81,29 @@ missing_out="$(bash "$smoke" "$missing" "$missing_sha" 2>&1)"
 missing_status=$?
 set -e
 test "$missing_status" -eq 1
-grep -Fq 'tree shaking omitted required desktop guest symbol: desktop_next_frame' <<<"$missing_out"
+grep -Fq 'desktop guest symbol has missing/duplicate/wrong i64 ABI: desktop_next_frame' <<<"$missing_out"
+
+wrong_abi="$work/wrong-abi-compiler"
+cat > "$wrong_abi" <<'IR'
+#!/usr/bin/env bash
+cat <<'LLVM'
+define i32 @desktop_next_frame(i32 %frame) {
+entry:
+  %next = add i32 %frame, 1
+  ret i32 %next
+}
+define i64 @desktop_initial_width() { ret i64 800 }
+define i64 @desktop_initial_height() { ret i64 500 }
+LLVM
+IR
+chmod 700 "$wrong_abi"
+wrong_abi_sha="$(hash_file "$wrong_abi")"
+set +e
+wrong_abi_out="$(bash "$smoke" "$wrong_abi" "$wrong_abi_sha" 2>&1)"
+wrong_abi_status=$?
+set -e
+test "$wrong_abi_status" -eq 1
+grep -Fq 'desktop guest symbol has missing/duplicate/wrong i64 ABI: desktop_next_frame' <<<"$wrong_abi_out"
 
 unreachable="$work/unreachable-compiler"
 cat > "$unreachable" <<'IR'

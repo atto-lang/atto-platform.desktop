@@ -6,6 +6,12 @@ pub fnc desktop_initial_height(): int {
     return 500;
 }
 
+// A guest-defined scalar frame transition; native desktop callbacks invoke
+// this compiled Oreslang function synchronously through the i64 C ABI.
+pub fnc desktop_next_frame(frame: int): int {
+    return frame + 1;
+}
+
 fnc desktop_unreachable_probe(): int {
     return 999;
 }

@@ -2,7 +2,7 @@
 # Link real Oreslang LLVM host scalar exports with a native C desktop host.
 set -euo pipefail
 if [ "$#" -lt 1 ] || [ "$#" -gt 2 ] || [ ! -x "$1" ]; then
-  echo "Usage: bash scripts/llvm-link-smoke.sh /path/to/oreslang-llvmc" >&2
+  echo "Usage: bash scripts/llvm-link-smoke.sh /path/to/oreslang-llvmc [expected-sha256]" >&2
   exit 64
 fi
 root="$(cd "$(dirname "$0")/.." && pwd -P)"

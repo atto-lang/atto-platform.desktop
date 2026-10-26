@@ -17,7 +17,9 @@ static ores_desktop_status opened(void *p,const ores_desktop_config *c) {
     CHECK(c->abi_version==ORES_DESKTOP_ABI_VERSION);
     CHECK(f->live_config != NULL);
     CHECK(c->title != f->live_config->title);
-    CHECK(strcmp(c->title,f->live_config->title)==0);
+    CHECK(c->title_length==f->live_config->title_length);
+    CHECK(memcmp(c->title,f->live_config->title,c->title_length)==0);
+    CHECK(c->title[c->title_length]=='\0');
     ++f->opens;
     return f->scenario==8 ? ORES_DESKTOP_BACKEND_ERROR : ORES_DESKTOP_OK;
 }
@@ -76,7 +78,7 @@ static void stopped(void *p) { ++((fixture*)p)->stops; }
 static void run_scenario(int scenario,ores_desktop_status expected_status,int frames,int events,
                          int presented_frames,int stopped_calls,int closed_calls) {
     fixture f={0};
-    ores_desktop_config c={ORES_DESKTOP_ABI_VERSION,800,600,2,3,"Desktop test"};
+    ores_desktop_config c={ORES_DESKTOP_ABI_VERSION,800,600,2,3,"Desktop test",12u};
     ores_desktop_app a={0};
     ores_desktop_backend b={0};
     f.scenario=scenario;
@@ -97,7 +99,7 @@ static void run_scenario(int scenario,ores_desktop_status expected_status,int fr
 }
 static void bad_arguments(void) {
     fixture f={0};
-    ores_desktop_config c={ORES_DESKTOP_ABI_VERSION,800,600,2,3,"Valid"};
+    ores_desktop_config c={ORES_DESKTOP_ABI_VERSION,800,600,2,3,"Valid",5u};
     ores_desktop_app a={0};
     ores_desktop_backend b={0};
     char too_long[129];
@@ -118,9 +120,11 @@ static void bad_arguments(void) {
     CHECK(ores_desktop_run(&c,&a,&b)==ORES_DESKTOP_INVALID_ARGUMENT);
     c.max_events_per_frame=257;
     CHECK(ores_desktop_run(&c,&a,&b)==ORES_DESKTOP_INVALID_ARGUMENT);
-    c.max_events_per_frame=2; c.title="";
+    c.max_events_per_frame=2; c.title=""; c.title_length=0;
     CHECK(ores_desktop_run(&c,&a,&b)==ORES_DESKTOP_INVALID_ARGUMENT);
-    memset(too_long,'X',128); too_long[128]='\0'; c.title=too_long;
+    memset(too_long,'X',128); too_long[128]='\0'; c.title=too_long; c.title_length=128;
+    CHECK(ores_desktop_run(&c,&a,&b)==ORES_DESKTOP_INVALID_ARGUMENT);
+    c.title="A\0B"; c.title_length=3;
     CHECK(ores_desktop_run(&c,&a,&b)==ORES_DESKTOP_INVALID_ARGUMENT);
     CHECK(f.opens==0);
 }

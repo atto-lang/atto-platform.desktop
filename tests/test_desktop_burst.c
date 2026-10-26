@@ -52,7 +52,7 @@ static ores_desktop_status frame_app(void *ctx, uint64_t frame) {
 static void stop_app(void *ctx) { ++((state *)ctx)->stops; }
 
 static void check_burst(uint32_t budget, uint64_t frame_limit, int stop_at_event) {
-    char title[128];
+    char title[127];
     ores_desktop_config cfg;
     ores_desktop_app app;
     ores_desktop_backend backend;

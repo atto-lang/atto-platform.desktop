@@ -11,8 +11,9 @@ static ores_desktop_status frame(void *ctx,uint64_t n) {
 }
 int main(void) {
     ores_desktop_sdl3_state state={0};
+    static const char title[]="Oreslang Desktop (native host bootstrap)";
     ores_desktop_config config={ORES_DESKTOP_ABI_VERSION,800,500,64,0,
-                                "Oreslang Desktop (native host bootstrap)"};
+                                title,sizeof title-1u};
     ores_desktop_app app={0};
     ores_desktop_backend backend=ores_desktop_sdl3_backend(&state);
     ores_desktop_status result;

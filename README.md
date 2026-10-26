@@ -65,11 +65,10 @@ compiler, the other `desktop_guest_scalar_*` CTests exercise **host-only
 C ABI stubs**, including a malformed frame result rejected with cleanup.
 Neither stub proves Oreslang compilation or actor/UI guest parity.
 
-
 ## Design
 
 - Oreslang LLVM: source verification, native IR, AOT objects. It owns guest calling conventions and future host imports.
-- ores_desktop: versioned single-threaded host event-loop C ABI, bounded polling and explicit lifecycle.
+- ores_desktop: versioned single-threaded host event-loop C ABI, bounded polling, explicit lifecycle, and length-explicit title bytes (no caller-side NUL scan).
 - ores_desktop_sdl3: optional native window/input backend for Linux, macOS and Windows, without embedding SDL pointers in the stable event type.
 - Apps: native C callbacks for now. No borrowed event pointer can outlive a callback, and no C++ exception should cross this boundary.
 

@@ -109,7 +109,7 @@ static void bad_arguments(void) {
     CHECK(ores_desktop_run(NULL,&a,&b)==ORES_DESKTOP_INVALID_ARGUMENT);
     CHECK(ores_desktop_run(&c,NULL,&b)==ORES_DESKTOP_INVALID_ARGUMENT);
     CHECK(ores_desktop_run(&c,&a,NULL)==ORES_DESKTOP_INVALID_ARGUMENT);
-    c.abi_version=2;
+    c.abi_version=ORES_DESKTOP_ABI_VERSION+1u;
     CHECK(ores_desktop_run(&c,&a,&b)==ORES_DESKTOP_INVALID_ARGUMENT);
     c.abi_version=ORES_DESKTOP_ABI_VERSION;
     c.width=0;

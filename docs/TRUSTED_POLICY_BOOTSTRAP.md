@@ -10,8 +10,8 @@
   **no** `actions/checkout`, PR checkout, uploaded artifact, privileged secret,
   cross-organization carrier, source build, token write or status publication.
 - The workflow fetches only **same-repository policy blob**
-  `7db086e93169a6e6d961bcfb025fa0850d288bee`, then verifies SHA-256
-  `9ad2864592152ef70095258ffb7710944819281fc0b88f4633b0fd6b5f45b625`
+  `4f92494e54aa8273c27ed67cc6245a3848a54bc0`, then verifies SHA-256
+  `d3269e7206e63691eddbf6d80c4012ef1e0466235300efe5f7e5f55dab93f7e2`
   before executing it from runner temporary storage.
 - The policy compares authoritative PR ID/head/base with event metadata, checks
   branch protection, strict required checks, admin enforcement, and current-head
@@ -19,9 +19,11 @@
   under `.github/`, verifier, or policy test files (including renames) require
   two distinct current-head approvals including `ORESoftware`, with reviewer
   write access checked via GitHub's metadata API. Its required checks must
-  include all five desktop jobs with a specific GitHub App issuer; force pushes,
+  include all five desktop jobs with the verified GitHub Actions App ID `15368`; force pushes,
   branch deletion, stale review retention, or disabled CODEOWNER enforcement
-  cause an explicit denial.
+  cause an explicit denial. App-ID pinning alone does not prevent a PR
+  from changing its own CI workflow; the protected workflow provenance and
+  independent review gates are still necessary.
 
 ## Fail-closed limitations
 
@@ -54,7 +56,7 @@
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p 'test_trusted_policy*.py' -v
 ```
 
-The 34 tests cover clean metadata, hostile PR workflow/verifier modifications,
+The 35 tests cover clean metadata, hostile PR workflow/verifier modifications,
 renamed sensitive files, untrusted approvals, missing/stale approvals,
 branch-protection failures, incomplete pagination, token-scope-safe workflow
 structure, and a fake GitHub CLI process restricted to GETs. They do **not**

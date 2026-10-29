@@ -178,4 +178,41 @@ class Check(unittest.TestCase):
     self.assertEqual(result.returncode,0,(result.stdout,result.stderr))
     self.assertFalse(marker.exists(),'checkout verifier executed injected Git fsmonitor')
 
+
+ def test_git_trace_environment_must_not_write_outside_checkout(self):
+  from pathlib import Path
+  from unittest import mock
+  with tempfile.TemporaryDirectory(prefix='outside_git_trace_') as tmp:
+   for key in ('GIT_TRACE', 'GIT_TRACE2_EVENT', 'GIT_TRACE2_PERF'):
+    with self.subTest(trace_variable=key):
+     dest=Path(tmp)/('trace_'+key)
+     with mock.patch.dict(os.environ,{key:str(dest)}):
+      subprocess.run(['git','rev-parse','HEAD'],cwd=self.root,check=True,
+                     stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+      self.assertTrue(dest.exists(),'control: Git trace failed to create file')
+      dest.unlink()
+      result=self.run_verifier()
+      self.assertEqual(result.returncode,0,(result.stdout,result.stderr))
+      self.assertFalse(dest.exists(),'checkout verifier created external Git trace')
+
+ def test_git_external_diff_and_hooks_are_not_invoked(self):
+  if os.name=='nt':self.skipTest('POSIX test-only shell diff fixture')
+  from pathlib import Path
+  from unittest import mock
+  with tempfile.TemporaryDirectory(prefix='outside_git_diff_') as tmp:
+   marker=Path(tmp)/'executed'
+   script=Path(tmp)/'untrusted_diff.sh'
+   script.write_text('#!/bin/sh\n: > "'+str(marker)+'"\nexit 0\n')
+   script.chmod(0o755)
+   (self.root/'.gitattributes').write_text('one.c diff=untrusted\n')
+   self.git('add','.gitattributes');self.git('commit','-qm','attributes');self.head=self.git('rev-parse','HEAD')
+   (self.root/'one.c').write_bytes(b'untrusted dirty bytes\n')
+   self.git('config','diff.untrusted.command',str(script))
+   self.git('diff','--','one.c')
+   self.assertTrue(marker.exists(),'control: external diff driver did not execute')
+   marker.unlink()
+   result=self.run_verifier()
+   self.assertEqual(result.returncode,1,(result.stdout,result.stderr))
+   self.assertFalse(marker.exists(),'checkout verifier executed an external diff driver')
+
 if __name__=='__main__': unittest.main()

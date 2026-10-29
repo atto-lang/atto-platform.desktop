@@ -127,6 +127,10 @@ class PinnedVerifierTests(unittest.TestCase):
         wf = WORKFLOW.read_text()
         self.assertIn('shell: pwsh\n        run: |\n          python -I -c', wf)
         self.assertIn('if ($LASTEXITCODE -ne 0) { throw "raw checkout source verification failed" }', wf)
+        self.assertIn('git config --global core.autocrlf false', wf)
+        windows = wf.split("  windows:\n", 1)[1].split("  linux-sanitizers:\n", 1)[0]
+        self.assertLess(windows.index("Disable Windows Git newline rewriting"),
+                        windows.index("Checkout pinned verifier commit"))
 
     def test_security_warning_does_not_claim_independent_workflow_trust(self):
         self.assertIn("not an independent trust root until reviewed/protected", WORKFLOW.read_text())

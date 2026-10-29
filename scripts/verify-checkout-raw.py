@@ -19,7 +19,7 @@ REPARSE_POINT = getattr(stat, 'FILE_ATTRIBUTE_REPARSE_POINT', 0x400)
 
 
 def git(*args):
-    return subprocess.run(['git', '--no-optional-locks', *args], check=True,
+    return subprocess.run(['git', '-c', 'core.fsmonitor=false', '--no-optional-locks', *args], check=True,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout
 
 

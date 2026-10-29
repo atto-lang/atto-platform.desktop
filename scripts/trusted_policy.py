@@ -16,6 +16,7 @@ REPO = 'ores-truffle-oreslang/oreslang-platform.desktop'
 OWNER = 'ORESoftware'
 SHA = re.compile(r'^[a-f0-9]{40}$')
 REQUIRED_CHECKS = {'linux-gcc', 'linux-clang', 'linux-sanitizers', 'windows', 'macos'}
+TRUSTED_STATUS_APP_ID = 15368  # Verified GitHub Actions app on current source-repo checks
 SENSITIVE = ('.github/', 'scripts/verify-checkout-raw.py',
              'scripts/test_', 'scripts/trusted_policy.py')
 
@@ -68,7 +69,7 @@ def decision(event, repo, event_name, get):
     listed_checks = checks.get('checks') or []
     trusted_checks = {item.get('context') for item in listed_checks
                       if isinstance(item, dict) and
-                      type(item.get('app_id')) is int and item['app_id'] > 0}
+                      type(item.get('app_id')) is int and item['app_id'] == TRUSTED_STATUS_APP_ID}
     require(REQUIRED_CHECKS <= trusted_checks,
             'five exact-source desktop checks not required with pinned app issuer')
     require(reviews_rule.get('dismiss_stale_reviews') is True,

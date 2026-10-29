@@ -16,8 +16,7 @@ REPO = 'ores-truffle-oreslang/oreslang-platform.desktop'
 OWNER = 'ORESoftware'
 SHA = re.compile(r'^[a-f0-9]{40}$')
 SENSITIVE = ('.github/', 'scripts/verify-checkout-raw.py',
-             'scripts/test_pinned_verifier_guard.py', 'scripts/trusted_policy.py',
-             'scripts/test_trusted_policy.py')
+             'scripts/test_', 'scripts/trusted_policy.py')
 
 class Denied(Exception):
     pass
@@ -71,9 +70,9 @@ def decision(event, repo, event_name, get):
             'admin enforcement missing')
     files = page_all(get, f'repos/{REPO}/pulls/{number}/files', maximum=5000)
     require(len(files) == pr.get('changed_files') and bool(files), 'incomplete PR files')
-    sensitive = any(isinstance(f.get('filename'), str) and
-                    any(f['filename'].startswith(prefix) for prefix in SENSITIVE)
-                    for f in files)
+    sensitive = any(any(isinstance(f.get(key), str) and
+                        any(f[key].startswith(prefix) for prefix in SENSITIVE)
+                        for key in ('filename', 'previous_filename')) for f in files)
     require(all(isinstance(f.get('filename'), str) for f in files), 'malformed changed path')
     reviews = page_all(get, f'repos/{REPO}/pulls/{number}/reviews', maximum=1000)
     latest = {}
@@ -89,6 +88,13 @@ def decision(event, repo, event_name, get):
                 for r in qualified), 'current-head CODEOWNER approval missing')
     require(len(qualified) >= (2 if sensitive else 1),
             'sensitive PR requires two independent current-head approvals')
+    for review in qualified:
+        login = review['user']['login']
+        require(re.fullmatch(r'[A-Za-z0-9-]{1,39}', login) is not None,
+                'invalid reviewer identity')
+        permission = get(f'repos/{REPO}/collaborators/{login}/permission')
+        require(permission.get('permission') in ('write', 'maintain', 'admin'),
+                'reviewer lacks verified write-level repository access')
     return {'kind': 'METADATA_ONLY_NOT_RELEASE_APPROVAL', 'head_sha': head_sha,
             'base_sha': base_sha, 'sensitive_paths': sensitive,
             'qualified_review_count': len(qualified)}

@@ -10,15 +10,18 @@
   **no** `actions/checkout`, PR checkout, uploaded artifact, privileged secret,
   cross-organization carrier, source build, token write or status publication.
 - The workflow fetches only **same-repository policy blob**
-  `705c774c2e18285b21633ee5cbf9e18984cf592b`, then verifies SHA-256
-  `fdee88ed28468b788eff7e277ba0477fe48f74c4dc35a85611390496166c6403`
+  `7db086e93169a6e6d961bcfb025fa0850d288bee`, then verifies SHA-256
+  `9ad2864592152ef70095258ffb7710944819281fc0b88f4633b0fd6b5f45b625`
   before executing it from runner temporary storage.
 - The policy compares authoritative PR ID/head/base with event metadata, checks
   branch protection, strict required checks, admin enforcement, and current-head
   independent reviews. It fully pages changed filenames and reviews. Changes
   under `.github/`, verifier, or policy test files (including renames) require
   two distinct current-head approvals including `ORESoftware`, with reviewer
-  write access checked via GitHub's metadata API.
+  write access checked via GitHub's metadata API. Its required checks must
+  include all five desktop jobs with a specific GitHub App issuer; force pushes,
+  branch deletion, stale review retention, or disabled CODEOWNER enforcement
+  cause an explicit denial.
 
 ## Fail-closed limitations
 
@@ -51,7 +54,7 @@
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p 'test_trusted_policy*.py' -v
 ```
 
-The 28 tests cover clean metadata, hostile PR workflow/verifier modifications,
+The 34 tests cover clean metadata, hostile PR workflow/verifier modifications,
 renamed sensitive files, untrusted approvals, missing/stale approvals,
 branch-protection failures, incomplete pagination, token-scope-safe workflow
 structure, and a fake GitHub CLI process restricted to GETs. They do **not**

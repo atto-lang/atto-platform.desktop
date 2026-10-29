@@ -1,10 +1,11 @@
 from pathlib import Path
+import hashlib
 import unittest
 import yaml
 
 WF = Path(__file__).resolve().parent.parent / '.github' / 'workflows' / 'desktop-trusted-pr-metadata-policy.yml'
-BLOB = '705c774c2e18285b21633ee5cbf9e18984cf592b'
-DIGEST = 'fdee88ed28468b788eff7e277ba0477fe48f74c4dc35a85611390496166c6403'
+BLOB = '7db086e93169a6e6d961bcfb025fa0850d288bee'
+DIGEST = '9ad2864592152ef70095258ffb7710944819281fc0b88f4633b0fd6b5f45b625'
 
 class WorkflowTests(unittest.TestCase):
     def setUp(self):
@@ -27,6 +28,8 @@ class WorkflowTests(unittest.TestCase):
     def test_immutable_policy_blob_and_digest(self):
         self.assertIn(f'/git/blobs/{BLOB}', self.raw)
         self.assertIn(DIGEST, self.raw)
+        policy = WF.resolve().parent.parent.parent / 'scripts' / 'trusted_policy.py'
+        self.assertEqual(hashlib.sha256(policy.read_bytes()).hexdigest(), DIGEST)
         self.assertIn('gh api --method GET', self.raw)
         self.assertIn('python3 -I "$RUNNER_TEMP/desktop-trusted-policy.py"', self.raw)
     def test_no_candidate_execution_or_artifact(self):

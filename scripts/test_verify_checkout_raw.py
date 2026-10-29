@@ -215,4 +215,37 @@ class Check(unittest.TestCase):
    self.assertEqual(result.returncode,1,(result.stdout,result.stderr))
    self.assertFalse(marker.exists(),'checkout verifier executed an external diff driver')
 
+ def test_ambient_git_index_cannot_hide_staged_change(self):
+  # A clean alternate index must not conceal a dirty *real* .git/index.
+  from pathlib import Path
+  from unittest import mock
+  with tempfile.TemporaryDirectory(prefix='alternate_git_index_') as tmp:
+   clean_index=Path(tmp)/'index'
+   shutil.copyfile(self.root/'.git'/'index',clean_index)
+   original=(self.root/'one.c').read_bytes()
+   (self.root/'one.c').write_bytes(b'UNAPPROVED STAGED CONTENT\n')
+   self.git('add','one.c')
+   (self.root/'one.c').write_bytes(original)
+   self.assertEqual(self.run_verifier().returncode,1)
+   with mock.patch.dict(os.environ,{'GIT_INDEX_FILE':str(clean_index)}):
+    result=self.run_verifier()
+   self.assertEqual(result.returncode,1,(result.stdout,result.stderr))
+   self.assertIn('index does not match',result.stderr)
+
+ def test_git_dir_work_tree_override_cannot_replace_trust_root(self):
+  from pathlib import Path
+  from unittest import mock
+  with tempfile.TemporaryDirectory(prefix='alternate_git_repo_') as tmp:
+   alternate=Path(tmp)/'clean.git'
+   shutil.copytree(self.root/'.git',alternate)
+   original=(self.root/'one.c').read_bytes()
+   (self.root/'one.c').write_bytes(b'UNAPPROVED STAGED CONTENT\n')
+   self.git('add','one.c')
+   (self.root/'one.c').write_bytes(original)
+   env={'GIT_DIR':str(alternate),'GIT_WORK_TREE':str(self.root)}
+   with mock.patch.dict(os.environ,env):
+    result=self.run_verifier()
+   self.assertEqual(result.returncode,1,(result.stdout,result.stderr))
+   self.assertIn('index does not match',result.stderr)
+
 if __name__=='__main__': unittest.main()

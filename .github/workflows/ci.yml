@@ -10,7 +10,18 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # Immutable *content* pin, not an independent trust root until reviewed/protected.
+      - name: Checkout pinned verifier commit (same private repository)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 384ae50e3fa76caa02d7697b2d6934c9aa955a58
+          persist-credentials: false
+      - name: Pin verifier bytes outside candidate checkout
+        shell: bash
+        run: |
+          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="0b8e142de195cd752f3c35aaca35cacaf6d7d6add71a34d4cd3eab597c8c04a8" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
+      - name: Checkout candidate exact source HEAD
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
@@ -20,11 +31,13 @@ jobs:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          python3 scripts/verify-checkout-raw.py
+          python3 -I "$RUNNER_TEMP/ores-desktop-pinned-verifier.py"
       - name: Exercise raw-checkout security regressions
         run: python3 -m unittest discover -s scripts -p 'test_verify_checkout_raw.py' -q
       - name: Exercise portable checkout security regressions
         run: python3 -m unittest discover -s scripts -p 'test_verify_checkout_windows.py' -q
+      - name: Exercise pinned-verifier trust-boundary regressions
+        run: python3 -m unittest discover -s scripts -p 'test_pinned_verifier_guard.py' -q
       - name: Validate integration shell syntax
         run: bash -n scripts/llvm-link-smoke.sh
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DORES_DESKTOP_WITH_SDL3=OFF
@@ -34,7 +47,18 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # Immutable *content* pin, not an independent trust root until reviewed/protected.
+      - name: Checkout pinned verifier commit (same private repository)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 384ae50e3fa76caa02d7697b2d6934c9aa955a58
+          persist-credentials: false
+      - name: Pin verifier bytes outside candidate checkout
+        shell: bash
+        run: |
+          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="0b8e142de195cd752f3c35aaca35cacaf6d7d6add71a34d4cd3eab597c8c04a8" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
+      - name: Checkout candidate exact source HEAD
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
@@ -44,11 +68,13 @@ jobs:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          python3 scripts/verify-checkout-raw.py
+          python3 -I "$RUNNER_TEMP/ores-desktop-pinned-verifier.py"
       - name: Exercise raw-checkout security regressions
         run: python3 -m unittest discover -s scripts -p 'test_verify_checkout_raw.py' -q
       - name: Exercise portable checkout security regressions
         run: python3 -m unittest discover -s scripts -p 'test_verify_checkout_windows.py' -q
+      - name: Exercise pinned-verifier trust-boundary regressions
+        run: python3 -m unittest discover -s scripts -p 'test_pinned_verifier_guard.py' -q
       - run: cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DORES_DESKTOP_WITH_SDL3=OFF
       - run: cmake --build build --parallel 2
       - run: ctest --test-dir build --output-on-failure
@@ -56,7 +82,18 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # Immutable *content* pin, not an independent trust root until reviewed/protected.
+      - name: Checkout pinned verifier commit (same private repository)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 384ae50e3fa76caa02d7697b2d6934c9aa955a58
+          persist-credentials: false
+      - name: Pin verifier bytes outside candidate checkout
+        shell: bash
+        run: |
+          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="0b8e142de195cd752f3c35aaca35cacaf6d7d6add71a34d4cd3eab597c8c04a8" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
+      - name: Checkout candidate exact source HEAD
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
@@ -66,11 +103,13 @@ jobs:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          python3 scripts/verify-checkout-raw.py
+          python3 -I "$RUNNER_TEMP/ores-desktop-pinned-verifier.py"
       - name: Exercise raw-checkout security regressions
         run: python3 -m unittest discover -s scripts -p 'test_verify_checkout_raw.py' -q
       - name: Exercise portable checkout security regressions
         run: python3 -m unittest discover -s scripts -p 'test_verify_checkout_windows.py' -q
+      - name: Exercise pinned-verifier trust-boundary regressions
+        run: python3 -m unittest discover -s scripts -p 'test_pinned_verifier_guard.py' -q
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DORES_DESKTOP_WITH_SDL3=OFF
       - run: cmake --build build --parallel 2
       - run: ctest --test-dir build --output-on-failure
@@ -78,7 +117,18 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # Immutable *content* pin, not an independent trust root until reviewed/protected.
+      - name: Checkout pinned verifier commit (same private repository)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 384ae50e3fa76caa02d7697b2d6934c9aa955a58
+          persist-credentials: false
+      - name: Pin verifier bytes outside candidate checkout
+        shell: pwsh
+        run: |
+          python -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="0b8e142de195cd752f3c35aaca35cacaf6d7d6add71a34d4cd3eab597c8c04a8" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
+      - name: Checkout candidate exact source HEAD
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
@@ -87,13 +137,18 @@ jobs:
         env:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          python scripts/verify-checkout-raw.py
+          python -I "$env:RUNNER_TEMP/ores-desktop-pinned-verifier.py"
           if ($LASTEXITCODE -ne 0) { throw "raw checkout source verification failed" }
       - name: Exercise Windows-compatible checkout regressions
         shell: pwsh
         run: |
           python -m unittest discover -s scripts -p 'test_verify_checkout_windows.py' -q
           if ($LASTEXITCODE -ne 0) { throw "checkout regression tests failed" }
+      - name: Exercise pinned-verifier trust-boundary regressions
+        shell: pwsh
+        run: |
+          python -m unittest discover -s scripts -p 'test_pinned_verifier_guard.py' -q
+          if ($LASTEXITCODE -ne 0) { throw "pinned-verifier guard regressions failed" }
       - run: cmake -S . -B build -DBUILD_TESTING=ON -DORES_DESKTOP_WITH_SDL3=OFF
       - run: cmake --build build --config Release --parallel 2
       - run: ctest --test-dir build -C Release --output-on-failure
@@ -102,7 +157,18 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # Immutable *content* pin, not an independent trust root until reviewed/protected.
+      - name: Checkout pinned verifier commit (same private repository)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 384ae50e3fa76caa02d7697b2d6934c9aa955a58
+          persist-credentials: false
+      - name: Pin verifier bytes outside candidate checkout
+        shell: bash
+        run: |
+          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="0b8e142de195cd752f3c35aaca35cacaf6d7d6add71a34d4cd3eab597c8c04a8" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
+      - name: Checkout candidate exact source HEAD
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
@@ -112,11 +178,13 @@ jobs:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          python3 scripts/verify-checkout-raw.py
+          python3 -I "$RUNNER_TEMP/ores-desktop-pinned-verifier.py"
       - name: Exercise raw-checkout security regressions
         run: python3 -m unittest discover -s scripts -p 'test_verify_checkout_raw.py' -q
       - name: Exercise portable checkout security regressions
         run: python3 -m unittest discover -s scripts -p 'test_verify_checkout_windows.py' -q
+      - name: Exercise pinned-verifier trust-boundary regressions
+        run: python3 -m unittest discover -s scripts -p 'test_pinned_verifier_guard.py' -q
       - run: >
           cmake -S . -B build-sanitize -DCMAKE_C_COMPILER=clang
           -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DORES_DESKTOP_WITH_SDL3=OFF

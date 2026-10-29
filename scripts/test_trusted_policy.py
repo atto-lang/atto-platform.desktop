@@ -22,9 +22,13 @@ class PolicyTests(unittest.TestCase):
             f'repos/{REPO}/pulls/16': self.pr,
             f'repos/{REPO}/branches/main': {'protected': True, 'commit': {'sha': BASE}},
             f'repos/{REPO}/branches/main/protection': {
-                'required_status_checks': {'strict': True},
-                'required_pull_request_reviews': {'required_approving_review_count': 2},
-                'enforce_admins': {'enabled': True}},
+                'required_status_checks': {'strict': True, 'checks': [
+                    {'context': name, 'app_id': 1234} for name in sorted(m.REQUIRED_CHECKS)]},
+                'required_pull_request_reviews': {'required_approving_review_count': 2,
+                    'dismiss_stale_reviews': True, 'require_code_owner_reviews': True},
+                'enforce_admins': {'enabled': True},
+                'allow_force_pushes': {'enabled': False},
+                'allow_deletions': {'enabled': False}},
             f'repos/{REPO}/pulls/16/files?per_page=100&page=1': [{'filename':'src/main.c'}],
             f'repos/{REPO}/pulls/16/reviews?per_page=100&page=1': [
                 {'user': {'login': 'ORESoftware'}, 'state': 'APPROVED', 'commit_id': HEAD}],
@@ -55,6 +59,26 @@ class PolicyTests(unittest.TestCase):
         self.deny()
     def test_admin_bypass_denied(self):
         self.db[f'repos/{REPO}/branches/main/protection']['enforce_admins']['enabled'] = False
+        self.deny()
+    def test_missing_one_desktop_required_check_denied(self):
+        c = self.db[f'repos/{REPO}/branches/main/protection']['required_status_checks']['checks']
+        c.pop()
+        self.deny()
+    def test_any_app_check_source_denied(self):
+        c = self.db[f'repos/{REPO}/branches/main/protection']['required_status_checks']['checks']
+        c[0]['app_id'] = None
+        self.deny()
+    def test_missing_stale_review_dismissal_denied(self):
+        self.db[f'repos/{REPO}/branches/main/protection']['required_pull_request_reviews']['dismiss_stale_reviews'] = False
+        self.deny()
+    def test_codeowner_reviews_not_required_denied(self):
+        self.db[f'repos/{REPO}/branches/main/protection']['required_pull_request_reviews']['require_code_owner_reviews'] = False
+        self.deny()
+    def test_force_push_allowed_denied(self):
+        self.db[f'repos/{REPO}/branches/main/protection']['allow_force_pushes']['enabled'] = True
+        self.deny()
+    def test_deletion_allowed_denied(self):
+        self.db[f'repos/{REPO}/branches/main/protection']['allow_deletions']['enabled'] = True
         self.deny()
     def test_stale_head_event_denied(self):
         self.event['pull_request']['head']['sha'] = 'c'*40

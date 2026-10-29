@@ -19,8 +19,12 @@ REPARSE_POINT = getattr(stat, 'FILE_ATTRIBUTE_REPARSE_POINT', 0x400)
 
 
 def git(*args):
+    # Git tracing writes to caller-controlled paths, even for plumbing commands.
+    # A checkout preflight must not create external GIT_TRACE* log files.
+    env = {key: value for key, value in os.environ.items()
+           if not key.upper().startswith('GIT_TRACE')}
     return subprocess.run(['git', '-c', 'core.fsmonitor=false', '--no-optional-locks', *args], check=True,
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env).stdout
 
 
 def fail(message):

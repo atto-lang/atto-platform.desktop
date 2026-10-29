@@ -117,6 +117,12 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
+      # Preserve raw Git blobs for both the SHA-256 pin and exact-byte guard.
+      - name: Disable Windows Git newline rewriting before checkout
+        shell: pwsh
+        run: |
+          git config --global core.autocrlf false
+          if ($LASTEXITCODE -ne 0) { throw "cannot configure byte-exact Git checkout" }
       # Immutable *content* pin, not an independent trust root until reviewed/protected.
       - name: Checkout pinned verifier commit (same private repository)
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683

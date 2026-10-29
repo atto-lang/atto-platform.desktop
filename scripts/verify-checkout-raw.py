@@ -19,10 +19,15 @@ REPARSE_POINT = getattr(stat, 'FILE_ATTRIBUTE_REPARSE_POINT', 0x400)
 
 
 def git(*args):
-    # Git tracing writes to caller-controlled paths, even for plumbing commands.
-    # A checkout preflight must not create external GIT_TRACE* log files.
+    # Git environment overrides may replace the *real* index (GIT_INDEX_FILE),
+    # redirect repository discovery (GIT_DIR/GIT_WORK_TREE), or create external
+    # trace files (GIT_TRACE*). Never inherit any untrusted GIT_* state.
+    # Ignore user/system config too; the repository-local config remains usable,
+    # with core.fsmonitor forcibly disabled for every plumbing invocation.
     env = {key: value for key, value in os.environ.items()
-           if not key.upper().startswith('GIT_TRACE')}
+           if not key.upper().startswith('GIT_')}
+    env['GIT_CONFIG_NOSYSTEM'] = '1'
+    env['GIT_CONFIG_GLOBAL'] = os.devnull
     return subprocess.run(['git', '-c', 'core.fsmonitor=false', '--no-optional-locks', *args], check=True,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env).stdout
 

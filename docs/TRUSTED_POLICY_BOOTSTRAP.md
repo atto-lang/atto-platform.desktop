@@ -1,0 +1,64 @@
+# Desktop default-branch PR metadata policy — candidate, not release approval
+
+## Trust separation
+
+- `.github/workflows/desktop-trusted-pr-metadata-policy.yml` is designed for
+  `pull_request_target` and `pull_request_review`. GitHub takes its workflow
+  **from the default branch**, rather than PR code. Until protected `main`
+  is established and this PR is independently reviewed, that root is not trusted.
+- Workflow permissions are `contents: read` and `pull-requests: read`. It uses
+  **no** `actions/checkout`, PR checkout, uploaded artifact, privileged secret,
+  cross-organization carrier, source build, token write or status publication.
+- The workflow fetches only **same-repository policy blob**
+  `705c774c2e18285b21633ee5cbf9e18984cf592b`, then verifies SHA-256
+  `fdee88ed28468b788eff7e277ba0477fe48f74c4dc35a85611390496166c6403`
+  before executing it from runner temporary storage.
+- The policy compares authoritative PR ID/head/base with event metadata, checks
+  branch protection, strict required checks, admin enforcement, and current-head
+  independent reviews. It fully pages changed filenames and reviews. Changes
+  under `.github/`, verifier, or policy test files (including renames) require
+  two distinct current-head approvals including `ORESoftware`, with reviewer
+  write access checked via GitHub's metadata API.
+
+## Fail-closed limitations
+
+1. The pinned blob currently comes from **draft PR #14**, not an independently
+   approved, protected policy release. A digest guarantees bytes, not trust.
+2. The policy calls `GET /branches/main/protection`, which GitHub documents as
+   requiring **Administration: read**. The narrowly scoped automatic
+   `GITHUB_TOKEN` used by this workflow does not have that privilege. It will
+   **fail closed** on that API until a security-reviewed read-only attestation
+   mechanism is available; do not add a secret or broad token ad hoc.
+3. `pull_request_target` job checks are not a substitute for independently
+   verified, **exact-PR-head** checks and protected-branch required checks.
+   This workflow does not write check runs or report release approval.
+4. On the current private GitHub plan, rulesets return 403 and `main` is not
+   protected. Actions jobs still fail before runner allocation. Therefore this
+   candidate cannot run or be an enforceable release security gate now.
+5. For the bootstrap, do **not** disable protection or merge unreviewed code.
+   An authorized security/billing administrator must first provide eligible
+   private-branch protection and independent review, resolve runner admission,
+   then approve/publish a fixed trusted policy root and configure exact-head
+   required checks with source authentication. A policy update can never
+   self-approve merely because its own tests pass.
+6. Existing private-source exposure incidents conformance #22/#77 and
+   cross-organization publisher authorization source.java #962 remain blocking.
+   Do not copy private Git trees to another org without their disposition.
+
+## Local source-free acceptance
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p 'test_trusted_policy*.py' -v
+```
+
+The 28 tests cover clean metadata, hostile PR workflow/verifier modifications,
+renamed sensitive files, untrusted approvals, missing/stale approvals,
+branch-protection failures, incomplete pagination, token-scope-safe workflow
+structure, and a fake GitHub CLI process restricted to GETs. They do **not**
+prove that the policy ran on hosted GitHub Actions or that native desktop tests
+passed.
+
+GitHub references:
+- https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target
+- https://docs.github.com/en/rest/branches/branch-protection#get-branch-protection
+- https://github.com/ores-truffle-oreslang/oreslang-platform-conformance/issues/170

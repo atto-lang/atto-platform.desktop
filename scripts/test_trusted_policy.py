@@ -23,7 +23,7 @@ class PolicyTests(unittest.TestCase):
             f'repos/{REPO}/branches/main': {'protected': True, 'commit': {'sha': BASE}},
             f'repos/{REPO}/branches/main/protection': {
                 'required_status_checks': {'strict': True, 'checks': [
-                    {'context': name, 'app_id': 1234} for name in sorted(m.REQUIRED_CHECKS)]},
+                    {'context': name, 'app_id': m.TRUSTED_STATUS_APP_ID} for name in sorted(m.REQUIRED_CHECKS)]},
                 'required_pull_request_reviews': {'required_approving_review_count': 2,
                     'dismiss_stale_reviews': True, 'require_code_owner_reviews': True},
                 'enforce_admins': {'enabled': True},
@@ -67,6 +67,10 @@ class PolicyTests(unittest.TestCase):
     def test_any_app_check_source_denied(self):
         c = self.db[f'repos/{REPO}/branches/main/protection']['required_status_checks']['checks']
         c[0]['app_id'] = None
+        self.deny()
+    def test_wrong_positive_app_id_denied(self):
+        c = self.db[f'repos/{REPO}/branches/main/protection']['required_status_checks']['checks']
+        c[0]['app_id'] = 1234
         self.deny()
     def test_missing_stale_review_dismissal_denied(self):
         self.db[f'repos/{REPO}/branches/main/protection']['required_pull_request_reviews']['dismiss_stale_reviews'] = False

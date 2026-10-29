@@ -15,6 +15,7 @@ from pathlib import Path
 REPO = 'ores-truffle-oreslang/oreslang-platform.desktop'
 OWNER = 'ORESoftware'
 SHA = re.compile(r'^[a-f0-9]{40}$')
+REQUIRED_CHECKS = {'linux-gcc', 'linux-clang', 'linux-sanitizers', 'windows', 'macos'}
 SENSITIVE = ('.github/', 'scripts/verify-checkout-raw.py',
              'scripts/test_', 'scripts/trusted_policy.py')
 
@@ -64,6 +65,20 @@ def decision(event, repo, event_name, get):
     checks = (protection.get('required_status_checks') or {})
     reviews_rule = (protection.get('required_pull_request_reviews') or {})
     require(checks.get('strict') is True, 'strict required checks absent')
+    listed_checks = checks.get('checks') or []
+    trusted_checks = {item.get('context') for item in listed_checks
+                      if isinstance(item, dict) and
+                      type(item.get('app_id')) is int and item['app_id'] > 0}
+    require(REQUIRED_CHECKS <= trusted_checks,
+            'five exact-source desktop checks not required with pinned app issuer')
+    require(reviews_rule.get('dismiss_stale_reviews') is True,
+            'stale review dismissal not enforced')
+    require(reviews_rule.get('require_code_owner_reviews') is True,
+            'CODEOWNER reviews not required by branch protection')
+    require((protection.get('allow_force_pushes') or {}).get('enabled') is False,
+            'force pushes permitted or unverifiable')
+    require((protection.get('allow_deletions') or {}).get('enabled') is False,
+            'branch deletion permitted or unverifiable')
     require((reviews_rule.get('required_approving_review_count') or 0) >= 1,
             'independent reviews not enforced')
     require((protection.get('enforce_admins') or {}).get('enabled') is True,

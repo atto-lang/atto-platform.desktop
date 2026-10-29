@@ -20,8 +20,9 @@ jobs:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          test "$(git rev-parse --verify HEAD)" = "$EXPECTED_SHA"
-          test -z "$(git status --porcelain --untracked-files=all)"
+          python3 scripts/verify-checkout-raw.py
+      - name: Exercise raw-checkout security regressions
+        run: python3 -m unittest discover -s scripts -p 'test_verify_checkout_raw.py' -q
       - name: Validate integration shell syntax
         run: bash -n scripts/llvm-link-smoke.sh
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DORES_DESKTOP_WITH_SDL3=OFF
@@ -41,8 +42,9 @@ jobs:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          test "$(git rev-parse --verify HEAD)" = "$EXPECTED_SHA"
-          test -z "$(git status --porcelain --untracked-files=all)"
+          python3 scripts/verify-checkout-raw.py
+      - name: Exercise raw-checkout security regressions
+        run: python3 -m unittest discover -s scripts -p 'test_verify_checkout_raw.py' -q
       - run: cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DORES_DESKTOP_WITH_SDL3=OFF
       - run: cmake --build build --parallel 2
       - run: ctest --test-dir build --output-on-failure
@@ -60,8 +62,9 @@ jobs:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          test "$(git rev-parse --verify HEAD)" = "$EXPECTED_SHA"
-          test -z "$(git status --porcelain --untracked-files=all)"
+          python3 scripts/verify-checkout-raw.py
+      - name: Exercise raw-checkout security regressions
+        run: python3 -m unittest discover -s scripts -p 'test_verify_checkout_raw.py' -q
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DORES_DESKTOP_WITH_SDL3=OFF
       - run: cmake --build build --parallel 2
       - run: ctest --test-dir build --output-on-failure
@@ -78,8 +81,8 @@ jobs:
         env:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          if ((git rev-parse --verify HEAD).Trim() -cne $env:EXPECTED_SHA) { throw "wrong source head" }
-          if ((git status --porcelain --untracked-files=all | Out-String).Trim().Length -ne 0) { throw "dirty source tree" }
+          python scripts/verify-checkout-raw.py
+          if ($LASTEXITCODE -ne 0) { throw "raw checkout source verification failed" }
       - run: cmake -S . -B build -DBUILD_TESTING=ON -DORES_DESKTOP_WITH_SDL3=OFF
       - run: cmake --build build --config Release --parallel 2
       - run: ctest --test-dir build -C Release --output-on-failure
@@ -98,8 +101,9 @@ jobs:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          test "$(git rev-parse --verify HEAD)" = "$EXPECTED_SHA"
-          test -z "$(git status --porcelain --untracked-files=all)"
+          python3 scripts/verify-checkout-raw.py
+      - name: Exercise raw-checkout security regressions
+        run: python3 -m unittest discover -s scripts -p 'test_verify_checkout_raw.py' -q
       - run: >
           cmake -S . -B build-sanitize -DCMAKE_C_COMPILER=clang
           -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DORES_DESKTOP_WITH_SDL3=OFF

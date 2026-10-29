@@ -13,6 +13,56 @@
 
 **Do not guess** that a `runner_id=0` failure means exhausted GitHub Actions minutes. Billing, org policy and runner-admission annotations need privileged verification.
 
+## P0: private-repository branch protection is plan-blocked (2026-10-29)
+
+**New authenticated evidence:** `GET /repos/ores-truffle-oreslang/<repo>/rulesets`
+returns HTTP **403** for **all seven** platform/conformance private
+repositories. GitHub's error message is exactly:
+`Upgrade to GitHub Pro or make this repository public to enable this feature.`
+The separate `GET .../branches/main/protection` call returns HTTP 403
+`Resource not accessible by integration`. Meanwhile each `main` reports
+`protected=false`, required status-check enforcement `off`, and zero
+required checks.
+
+This is **not** evidence that any repository may safely become public.
+**Keep every source repository PRIVATE.** For an organization-owned private
+repository, GitHub documents [GitHub Team or Enterprise]
+(https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets)
+as eligible for rulesets and protected branches; GitHub Pro is documented
+for eligible user-owned private repositories. Only an authorized
+organization billing owner can confirm the actual subscription and change
+it. A subscription change and a GitHub App permission grant are separate
+actions; neither is established by a repository's reported `admin` role.
+
+**Required administrator sequence:**
+
+1. In **Organization Settings → Billing & licensing**, verify the owning
+   organization, current GitHub subscription/entitlement, payment status,
+   and private repository protection eligibility. **If ineligible, arrange
+   an authorized GitHub Team/Enterprise subscription or GitHub Support
+   resolution**. Never change the repository's visibility.
+2. As an organization/repository admin, confirm that
+   `gh api repos/ores-truffle-oreslang/oreslang-platform.desktop/rulesets`
+   succeeds in a privileged session, or capture a GitHub Support diagnostic
+   explaining why it does not. If the ChatGPT GitHub App still returns
+   `Resource not accessible by integration`, inspect its **Administration**
+   repository access and reinstall/re-authorize only via official GitHub
+   controls. Never paste tokens into a PR/issue.
+3. Enforce a protected `main` or an **active** (not evaluate-only)
+   branch ruleset on all seven repositories using the controls below.
+   Verify real approvals, strict exact-head required checks and no bypass.
+   Never claim a passing gate based solely on the lack of a 403.
+4. Separately resolve source-org **Actions runner admission** in section 1.
+   Plan eligibility does not itself prove why Actions jobs report
+   `runner_id=0`, `steps=[]`.
+
+**Evidence distinction:** Ruleset HTTP 403 is direct **plan/feature
+eligibility rejection**; branch-protection HTTP 403 is an **integration
+authorization rejection**. Both must be remedied, and the post-change
+policy must be independently verified. Track evidence in
+[conformance issue #170]
+(https://github.com/ores-truffle-oreslang/oreslang-platform-conformance/issues/170).
+
 ## 1. Restore source-organization runner admission
 
 1. As an authorized `ores-truffle-oreslang` administrator, inspect **Organization Settings → Billing & licensing**: Actions budget, minutes, expenditure limits, payment eligibility and any denied spending. Record the actual GitHub diagnostic, not an inference.

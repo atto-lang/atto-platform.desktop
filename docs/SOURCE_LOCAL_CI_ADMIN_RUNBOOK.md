@@ -63,6 +63,39 @@ policy must be independently verified. Track evidence in
 [conformance issue #170]
 (https://github.com/ores-truffle-oreslang/oreslang-platform-conformance/issues/170).
 
+## Source-free administrator CLI probe (read-only)
+
+Draft PR #14 now ships `scripts/source-local-admin-probe.sh` and
+`scripts/test_source_local_admin_probe.py`. The probe invokes **only**
+`gh api --method GET`; it does not check out, compile, copy, upload or
+mutate private Oreslang source. It checks seven branch summaries and rule
+endpoints, then the exact source-local canary and desktop host job metadata.
+It runs against an **existing** administrator-owned `gh` session, not a
+token pasted into an issue.
+
+```sh
+gh auth status
+python3 -m unittest discover -s scripts -p 'test_source_local_admin_probe.py' -v
+bash scripts/source-local-admin-probe.sh 40928128150 40928128075
+```
+
+The five source-free synthetic regression tests passed locally. The probe
+prints `NO-GO` and **always exits 2 by design**, even when metadata is
+readable: a read-only script cannot independently approve a merge or private
+source export. An unreadable ruleset or branch policy is **UNVERIFIED**, not
+success. Its exact run IDs can be replaced with newly admitted source-org
+canary and matrix runs. A new run is accepted only after a human independently
+verifies nonzero runner IDs, real successful steps, correct source SHA,
+appropriate reviews, and effective branch protection.
+
+**Current source-only evidence:** no GitHub App control is available to
+edit organization billing, Actions policies, or private branch rules; both
+ruleset plan eligibility and GitHub App authorization need an administrator.
+The failed source-free job 123639033357 and Linux-Clang job 123639033599
+returned `404 BlobNotFound` when the job logs were requested. Those 404s do
+**not** establish the runner-admission root cause. See
+[the administrator Support escalation](https://github.com/ores-truffle-oreslang/oreslang-source.java/issues/963#issuecomment-6504900462).
+
 ## 1. Restore source-organization runner admission
 
 1. As an authorized `ores-truffle-oreslang` administrator, inspect **Organization Settings → Billing & licensing**: Actions budget, minutes, expenditure limits, payment eligibility and any denied spending. Record the actual GitHub diagnostic, not an inference.

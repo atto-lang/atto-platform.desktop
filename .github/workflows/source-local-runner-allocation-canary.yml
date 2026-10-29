@@ -1,11 +1,10 @@
 # Source-free diagnostic only: no checkout, repository reads, network fetches,
 # source export, artifact upload, compiler tests, or runtime tests.
 # A successful step alone is not exact-head source execution evidence.
+# No path filtering: required check must trigger even on unrelated PR files.
 name: Source-local runner allocation canary (metadata only)
 on:
   pull_request:
-    paths:
-      - .github/workflows/source-local-runner-allocation-canary.yml
   workflow_dispatch:
 
 permissions: {}

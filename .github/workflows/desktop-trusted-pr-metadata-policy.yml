@@ -22,8 +22,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api --method GET repos/ores-truffle-oreslang/oreslang-platform.desktop/git/blobs/705c774c2e18285b21633ee5cbf9e18984cf592b --jq .content | base64 -d > "$RUNNER_TEMP/desktop-trusted-policy.py"
-          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path(os.environ["RUNNER_TEMP"],"desktop-trusted-policy.py").read_bytes(); sys.exit(0 if hashlib.sha256(raw).hexdigest()=="fdee88ed28468b788eff7e277ba0477fe48f74c4dc35a85611390496166c6403" else "POLICY_BLOB_MISMATCH")'
+          gh api --method GET repos/ores-truffle-oreslang/oreslang-platform.desktop/git/blobs/7db086e93169a6e6d961bcfb025fa0850d288bee --jq .content | base64 -d > "$RUNNER_TEMP/desktop-trusted-policy.py"
+          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path(os.environ["RUNNER_TEMP"],"desktop-trusted-policy.py").read_bytes(); sys.exit(0 if hashlib.sha256(raw).hexdigest()=="9ad2864592152ef70095258ffb7710944819281fc0b88f4633b0fd6b5f45b625" else "POLICY_BLOB_MISMATCH")'
       - name: Run pinned default-branch policy against PR metadata only
         shell: bash
         env:

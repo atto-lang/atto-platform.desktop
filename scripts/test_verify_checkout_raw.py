@@ -1,5 +1,5 @@
 import contextlib,os,pathlib,shutil,subprocess,sys,tempfile,unittest
-VERIFY=pathlib.Path(__file__).with_name('verify_checkout_raw.py')
+VERIFY=pathlib.Path(__file__).with_name('verify-checkout-raw.py')
 class Check(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=pathlib.Path(self.tmp.name)

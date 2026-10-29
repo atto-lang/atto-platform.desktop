@@ -27,7 +27,9 @@ class PolicyTests(unittest.TestCase):
                 'enforce_admins': {'enabled': True}},
             f'repos/{REPO}/pulls/16/files?per_page=100&page=1': [{'filename':'src/main.c'}],
             f'repos/{REPO}/pulls/16/reviews?per_page=100&page=1': [
-                {'user': {'login': 'ORESoftware'}, 'state': 'APPROVED', 'commit_id': HEAD}]}
+                {'user': {'login': 'ORESoftware'}, 'state': 'APPROVED', 'commit_id': HEAD}],
+            f'repos/{REPO}/collaborators/ORESoftware/permission': {'permission': 'admin'},
+            f'repos/{REPO}/collaborators/security-second/permission': {'permission': 'write'}}
         self.calls = []
     def get(self, path):
         self.calls.append(path)
@@ -71,8 +73,19 @@ class PolicyTests(unittest.TestCase):
             {'filename': '.github/workflows/ci.yml'}]
         self.deny()
         self.db[f'repos/{REPO}/pulls/16/reviews?per_page=100&page=1'].append(
-            {'user': {'login': 'security_second'}, 'state': 'APPROVED', 'commit_id': HEAD})
+            {'user': {'login': 'security-second'}, 'state': 'APPROVED', 'commit_id': HEAD})
         self.assertTrue(self.decision()['sensitive_paths'])
+    def test_renamed_workflow_requires_second_review(self):
+        self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
+            {'filename': 'ordinary.txt', 'previous_filename': '.github/workflows/ci.yml'}]
+        self.deny()
+    def test_unprivileged_second_reviewer_is_denied(self):
+        self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
+            {'filename': '.github/workflows/ci.yml'}]
+        self.db[f'repos/{REPO}/pulls/16/reviews?per_page=100&page=1'].append(
+            {'user': {'login': 'security-second'}, 'state': 'APPROVED', 'commit_id': HEAD})
+        self.db[f'repos/{REPO}/collaborators/security-second/permission'] = {'permission':'read'}
+        self.deny()
     def test_verifier_tampering_requires_second_review(self):
         self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
             {'filename': 'scripts/verify-checkout-raw.py'}]

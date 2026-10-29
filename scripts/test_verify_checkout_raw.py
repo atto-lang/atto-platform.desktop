@@ -135,4 +135,47 @@ class Check(unittest.TestCase):
      m.check(self.head)
   finally:os.chdir(old)
 
+
+ def test_git_fsmonitor_config_must_not_execute(self):
+  if os.name=='nt':self.skipTest('POSIX shell fsmonitor fixture')
+  from pathlib import Path
+  with tempfile.TemporaryDirectory(prefix='safe_git_monitor_') as tmp:
+   marker=Path(tmp)/'EXECUTED'
+   script=Path(tmp)/'monitor.sh'
+   script.write_text('#!/bin/sh\n: > "'+str(marker)+'"\nprintf "0\\n"\n')
+   script.chmod(0o755)
+   self.git('config','core.fsmonitor',str(script))
+   for args in (('ls-files','--stage','-z'),
+                ('ls-files','--others','--exclude-standard','-z'),
+                ('ls-files','--others','--ignored','--exclude-standard','-z'),
+                ('ls-files','-v','-z')):
+    with self.subTest(args=args):
+     marker.unlink(missing_ok=True)
+     self.git(*args)
+     self.assertTrue(marker.exists(),'control: Git ls-files did not trigger fsmonitor')
+     marker.unlink()
+     result=self.run_verifier()
+     self.assertEqual(result.returncode,0,(result.stdout,result.stderr))
+     self.assertFalse(marker.exists(),'checkout verifier executed configured Git fsmonitor')
+ def test_git_fsmonitor_environment_must_not_execute(self):
+  if os.name=='nt':self.skipTest('POSIX shell fsmonitor fixture')
+  from pathlib import Path
+  from unittest import mock
+  with tempfile.TemporaryDirectory(prefix='safe_git_monitor_env_') as tmp:
+   marker=Path(tmp)/'EXECUTED'
+   script=Path(tmp)/'monitor.sh'
+   script.write_text('#!/bin/sh\n: > "'+str(marker)+'"\nprintf "0\\n"\n')
+   script.chmod(0o755)
+   values={'GIT_CONFIG_COUNT':'1','GIT_CONFIG_KEY_0':'core.fsmonitor',
+           'GIT_CONFIG_VALUE_0':str(script)}
+   with mock.patch.dict(os.environ,values):
+    marker.unlink(missing_ok=True)
+    subprocess.run(['git','ls-files','--stage','-z'],cwd=self.root,check=True,
+                   stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    self.assertTrue(marker.exists(),'control: injected fsmonitor did not execute')
+    marker.unlink()
+    result=self.run_verifier()
+    self.assertEqual(result.returncode,0,(result.stdout,result.stderr))
+    self.assertFalse(marker.exists(),'checkout verifier executed injected Git fsmonitor')
+
 if __name__=='__main__': unittest.main()

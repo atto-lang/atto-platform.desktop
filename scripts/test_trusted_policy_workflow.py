@@ -4,8 +4,8 @@ import unittest
 import yaml
 
 WF = Path(__file__).resolve().parent.parent / '.github' / 'workflows' / 'desktop-trusted-pr-metadata-policy.yml'
-BLOB = '7db086e93169a6e6d961bcfb025fa0850d288bee'
-DIGEST = '9ad2864592152ef70095258ffb7710944819281fc0b88f4633b0fd6b5f45b625'
+BLOB = '4f92494e54aa8273c27ed67cc6245a3848a54bc0'
+DIGEST = 'd3269e7206e63691eddbf6d80c4012ef1e0466235300efe5f7e5f55dab93f7e2'
 
 class WorkflowTests(unittest.TestCase):
     def setUp(self):

@@ -18,6 +18,7 @@ static struct {
  unsigned events, frames, starts, stops;
  ores_desktop_event last;
  ores_desktop_status event_result, start_result;
+ unsigned probe_rival;
 } app;
 static void reset(void){ memset(&mock,0,sizeof mock);memset(&app,0,sizeof app); }
 static void enqueue(SDL_Event e){CHECK(mock.queued<128);mock.events[mock.queued++]=e;}
@@ -45,7 +46,20 @@ SDL_Window *SDL_GetWindowFromEvent(const SDL_Event *e){
  }
 }
 void SDL_Delay(uint32_t ms){CHECK(ms==16);++mock.delay_count;}
-static ores_desktop_status start_app(void *x){(void)x;++app.starts;return app.start_result;}
+static ores_desktop_status start_app(void *x){
+ (void)x;++app.starts;
+ if (app.probe_rival) {
+   ores_desktop_sdl3_state rival={0};
+   ores_desktop_backend b=ores_desktop_sdl3_backend(&rival);
+   ores_desktop_config cfg={ORES_DESKTOP_ABI_VERSION,320,240,2,1,"mock SDL3"};
+   CHECK(b.open(b.context,&cfg)==ORES_DESKTOP_BACKEND_ERROR);
+   // Foreign close cannot clear current window's event-loop lease.
+   b.close(b.context);
+   CHECK(b.open(b.context,&cfg)==ORES_DESKTOP_BACKEND_ERROR);
+   CHECK(mock.init_count==1 && mock.create_count==1);
+ }
+ return app.start_result;
+}
 static ores_desktop_status event_app(void *x,const ores_desktop_event *e){
  (void)x;CHECK(e);++app.events;app.last=*e;return app.event_result;
 }
@@ -93,6 +107,16 @@ static void check_event(SDL_Event e,uint32_t type,uint32_t code,int32_t x,int32_
  CHECK(app.last.x==x && app.last.y==y);
  CHECK(app.frames==(quit?0u:2u)); CHECK(mock.delay_count==(quit?0u:2u));
  CHECK(app.stops==1);verify_closed(&s,1,1,1,1);
+}
+static void test_exclusive_event_pump(void){
+ ores_desktop_sdl3_state s={0};
+ reset();app.probe_rival=1;
+ CHECK(execute(&s,1)==ORES_DESKTOP_OK);
+ verify_closed(&s,1,1,1,1);
+ CHECK(app.starts==1 && app.stops==1 && app.frames==1);
+ // Successful close releases admission so a subsequent host can run.
+ reset();CHECK(execute(&s,1)==ORES_DESKTOP_OK);
+ verify_closed(&s,1,1,1,1);
 }
 static void test_event_translation(void){
  SDL_Event e={0};e.type=SDL_EVENT_QUIT;
@@ -145,7 +169,7 @@ static void test_unrecognized_bound(void){
  verify_closed(&s,1,1,1,1);
 }
 int main(void){
- test_lifecycle();test_event_translation();test_foreign_window_events();test_unrecognized_bound();
+ test_lifecycle();test_exclusive_event_pump();test_event_translation();test_foreign_window_events();test_unrecognized_bound();
  puts("desktop SDL3 mock lifecycle/translation/bounded-drain: PASS (not real SDL3)");
  return 0;
 }

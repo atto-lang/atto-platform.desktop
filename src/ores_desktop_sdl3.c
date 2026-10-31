@@ -30,6 +30,13 @@ static ores_desktop_status host_poll(void *context,ores_desktop_event *out,int *
     *has_event=0;
     /* Do not spin forever discarding unrelated SDL events. */
     for (n=0;n<64 && SDL_PollEvent(&ev);++n) {
+        /* SDL_PollEvent drains the process-wide queue. Never deliver another
+         * window's close, keyboard, pointer or resize events to this app.
+         * SDL_EVENT_QUIT is application-global and remains actionable.
+         * Multiple window hosts still require one shared event dispatcher. */
+        if (ev.type != SDL_EVENT_QUIT &&
+            SDL_GetWindowFromEvent(&ev) != (SDL_Window*)s->window)
+            continue;
         out->type=0; out->code=0; out->x=0; out->y=0;
         switch (ev.type) {
         case SDL_EVENT_QUIT:

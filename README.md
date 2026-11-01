@@ -14,7 +14,7 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ~~~
 
-This proves the small in-process C host ABI, deterministic application lifecycle, input event contract and error cleanup on a fake backend. The headless test does not display a window.
+This proves the small in-process C host ABI, deterministic application lifecycle, input event contract, UTF-8 title validation and error cleanup on a fake backend. The headless test does not display a window.
 
 ## Open a real desktop window (SDL3)
 

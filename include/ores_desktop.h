@@ -25,7 +25,7 @@ typedef struct {
 typedef struct {
     uint32_t abi_version, width, height, max_events_per_frame;
     uint64_t frame_limit; /* 0 means unbounded */
-    const char *title;    /* borrowed, NUL terminated, <=127 bytes */
+    const char *title;    /* borrowed UTF-8, NUL terminated, 1..127 bytes */
 } ores_desktop_config;
 /* Borrowed callback event pointer expires on return. Return OK or STOP only.
  * The host honors the original polled QUIT event even if callback code

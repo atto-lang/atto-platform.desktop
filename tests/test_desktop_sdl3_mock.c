@@ -168,8 +168,46 @@ static void test_unrecognized_bound(void){
  CHECK(app.frames==1 && mock.delay_count==1);
  verify_closed(&s,1,1,1,1);
 }
+
+static void test_foreign_input_cannot_impersonate_our_window(void){
+ ores_desktop_sdl3_state s={0}; SDL_Event e={0}; reset();
+ e.key.type=SDL_EVENT_KEY_DOWN; e.key.windowID=99u; e.key.scancode=42; enqueue(e);
+ e.key.type=SDL_EVENT_KEY_UP; e.key.windowID=99u; enqueue(e);
+ e.button.type=SDL_EVENT_MOUSE_BUTTON_DOWN; e.button.windowID=99u; enqueue(e);
+ e.button.type=SDL_EVENT_MOUSE_BUTTON_UP; e.button.windowID=99u; enqueue(e);
+ e.motion.type=SDL_EVENT_MOUSE_MOTION; e.motion.windowID=99u; enqueue(e);
+ CHECK(execute(&s,2)==ORES_DESKTOP_OK);
+ CHECK(app.events==0 && app.frames==2 && app.stops==1);
+ CHECK(mock.next==5); verify_closed(&s,1,1,1,1);
+}
+static void test_global_quit_survives_foreign_event_flood(void){
+ ores_desktop_sdl3_state s={0}; SDL_Event e={0}; reset();
+ for(unsigned i=0;i<10;i++){
+   e.window.type=SDL_EVENT_WINDOW_CLOSE_REQUESTED;
+   e.window.windowID=99u; enqueue(e);
+ }
+ e.type=SDL_EVENT_QUIT; enqueue(e);
+ CHECK(execute(&s,2)==ORES_DESKTOP_OK);
+ CHECK(app.events==1 && app.last.type==ORES_DESKTOP_QUIT);
+ CHECK(app.frames==0 && app.stops==1 && mock.next==11);
+ verify_closed(&s,1,1,1,1);
+}
+static void test_unknown_own_window_event_cannot_inject_guest_callback(void){
+ ores_desktop_sdl3_state s={0}; SDL_Event e={0}; reset();
+ e.window.type=0xf001u; e.window.windowID=23u; enqueue(e);
+ e.key.type=SDL_EVENT_KEY_DOWN; e.key.windowID=23u;
+ e.key.scancode=9u; enqueue(e);
+ CHECK(execute(&s,1)==ORES_DESKTOP_OK);
+ CHECK(app.events==1 && app.last.type==ORES_DESKTOP_KEY_DOWN);
+ CHECK(app.last.code==9u && app.frames==1 && mock.next==2);
+ verify_closed(&s,1,1,1,1);
+}
+
 int main(void){
  test_lifecycle();test_exclusive_event_pump();test_event_translation();test_foreign_window_events();test_unrecognized_bound();
+ test_foreign_input_cannot_impersonate_our_window();
+ test_global_quit_survives_foreign_event_flood();
+ test_unknown_own_window_event_cannot_inject_guest_callback();
  puts("desktop SDL3 mock lifecycle/translation/bounded-drain: PASS (not real SDL3)");
  return 0;
 }

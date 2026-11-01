@@ -65,6 +65,13 @@ int main(void) {
     char max_ascii[128], max_utf8[128], split_utf8[128], too_long[129];
     const char *bad[] = {
         "\x80",                       /* lone continuation */
+        "\xc1\xbf",                   /* overlong two-byte edge */
+        "\xe0\x9f\xbf",               /* three-byte lower boundary */
+        "\xed\xa0\xbf",               /* upper surrogate */
+        "\xf0\x80\x80\x80",           /* four-byte lower boundary */
+        "\xf4\x90\x80\x80",           /* above maximum scalar */
+        "\xe2\x82\xff",               /* invalid third continuation */
+        "\xf0\x90\x80",               /* incomplete four-byte scalar */
         "\xc0\xaf",                 /* overlong two-byte sequence */
         "\xe0\x80\x80",         /* overlong three-byte sequence */
         "\xed\xa0\x80",         /* UTF-16 surrogate */
@@ -80,6 +87,14 @@ int main(void) {
     assert_title("caf\xc3\xa9",1);
     assert_title("\xe2\x82\xac",1);
     assert_title("\xf0\x9f\x8c\x8d",1);
+    /* Scalar min/max edges: accept all legal RFC 3629 ranges. */
+    assert_title("\x7f",1);
+    assert_title("\xc2\x80",1);
+    assert_title("\xdf\xbf",1);
+    assert_title("\xe0\xa0\x80",1);
+    assert_title("\xed\x9f\xbf",1);
+    assert_title("\xf0\x90\x80\x80",1);
+    assert_title("\xf4\x8f\xbf\xbf",1);
     assert_title("",0);
     memset(max_ascii,'A',127); max_ascii[127]='\0';
     assert_title(max_ascii,1);

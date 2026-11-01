@@ -69,7 +69,7 @@ int main(void) {
         "\xe0\x9f\xbf",               /* three-byte lower boundary */
         "\xed\xa0\xbf",               /* upper surrogate */
         "\xf0\x80\x80\x80",           /* four-byte lower boundary */
-        "\xf4\x90\x80\x80",           /* above maximum scalar */
+        "\xf4\x8f\xbf\xc0",           /* invalid fourth continuation */
         "\xe2\x82\xff",               /* invalid third continuation */
         "\xf0\x90\x80",               /* incomplete four-byte scalar */
         "\xc0\xaf",                 /* overlong two-byte sequence */

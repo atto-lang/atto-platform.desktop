@@ -7,7 +7,9 @@
 /* SDL_PollEvent consumes a process-global queue. Until a central window
  * dispatcher exists, multiple independent desktop loops cannot run safely.
  * Gate ownership before SDL initialization and release on every exit path. */
-static _Atomic(ores_desktop_sdl3_state*) active_owner = ATOMIC_VAR_INIT(NULL);
+/* Static storage zero-initializes the atomic pointer; avoid the deprecated
+ * ATOMIC_VAR_INIT macro (removed by newer C library headers). */
+static _Atomic(ores_desktop_sdl3_state*) active_owner = NULL;
 static void release_owner(ores_desktop_sdl3_state *s) {
     ores_desktop_sdl3_state *expected = s;
     (void)atomic_compare_exchange_strong(&active_owner, &expected, NULL);

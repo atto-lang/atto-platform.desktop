@@ -38,6 +38,14 @@ A GraalVM 25 Native Image build requires its FFM upcall/downcall metadata admiss
 
 The probes validate host layout (64-bit only), ABI version mismatch rejection, callback/status semantics, correct stop/close counts and native interop. They do **not** open SDL windows, load AttoLang guest classes, prove actor isolation or prove NativeAOT/Native Image deployment. Current host v1 uses a borrowed NUL-terminated title; title ABI v2 and UTF-8 hardening are separate draft PRs and must be rebased semantically before merging.
 
+## Additive host-only SPSC and genuine native-image gates
+
+The `include/ores_desktop_ui_mailbox.h` / `src/ores_desktop_ui_mailbox.c` pair is a bounded host-only **single-producer/single-consumer** command edge. It has no guest code, OS window registry or renderer. A separate runtime component must aggregate multiple actors, wake the UI thread, validate tenant/capability/window generations, and dispatch. C11 atomics are used on Linux/macOS and Windows uses native Interlocked operations because MSVC's C11 atomic headers are experimental. Push/Pop never allocate and return FULL/EMPTY promptly. Closing is terminal; do not reuse storage while threads might access it.
+
+The `desktop-cross-runtime-ffi` workflow now additionally **attempts** actual Linux x64 published .NET NativeAOT and GraalVM Native Image host-probe binaries. These builds are deliberately separate from JVM/managed and compiler-backed AttoLang guest execution. Graal's `interop/graalvm/reachability-metadata.json` explicitly describes each registered C ABI upcall/downcall and the image must be built with `--no-fallback`. See [GraalVM 25 FFM Native Image registration requirements](https://www.graalvm.org/jdk25/reference-manual/native-image/native-code-interoperability/ffm-api/).
+
+If the GitHub Actions job has `steps=null`, those AOT steps **did not run**. Do not report any NativeAOT/Native Image pass until an exact-head executed-step job and binary receipt exist.
+
 ## Stable source-level desktop API to build next
 
 Proposed package split (illustrative names, **not** accepted guest syntax):

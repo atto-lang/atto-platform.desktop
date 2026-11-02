@@ -4,6 +4,10 @@ Native desktop platform bootstrap for [Oreslang LLVM](https://github.com/ores-tr
 
 **Status: experimental host ABI and SDL3 window/event adapter.** This is not yet a desktop GUI framework, an Oreslang actor runtime, or a compiler extension. It intentionally builds and tests without LLVM, SDL3, a display server, or privileged OS APIs.
 
+## AttoLang cross-runtime desktop interop (experimental)
+
+AttoLang (formerly Oreslang) targets a common desktop host ABI for LLVM, .NET NativeAOT and GraalVM. This branch adds an **optional shared C host library**, a .NET 10 NativeAOT-compatible P/Invoke callback smoke, and a GraalVM JDK 25 Foreign Function & Memory smoke. These are **headless host-side interop tests**, not AttoLang compiler-backed desktop apps or production GUI support. The existing LLVM scalar guest-link smoke remains separate. See [cross-backend architecture, execution instructions and open parity gates](docs/ATTO_DESKTOP_CROSS_BACKEND.md).
+
 ## Native host CI
 
 Requires CMake 3.20+ and a C11 compiler.

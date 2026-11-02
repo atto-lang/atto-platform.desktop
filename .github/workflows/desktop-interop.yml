@@ -40,6 +40,34 @@ jobs:
         env:
           LD_LIBRARY_PATH: ${{ github.workspace }}/build-interop
         run: dotnet run -c Release --project interop/dotnet/AttoDesktopInterop.csproj
+  dotnet-nativeaot-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact source commit
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: '10.0.x'
+      - run: cmake -S . -B build-interop -DATTO_DESKTOP_BUILD_SHARED=ON -DBUILD_TESTING=ON
+      - run: cmake --build build-interop --parallel 2
+      - name: Publish native executable without JIT or managed fallback
+        run: >
+          dotnet publish interop/dotnet/AttoDesktopInterop.csproj -c Release
+          -r linux-x64 -p:PublishAot=true -p:SelfContained=true
+          -o build-interop/dotnet-native
+      - name: Execute published NativeAOT host bridge (not an Atto guest)
+        env:
+          LD_LIBRARY_PATH: ${{ github.workspace }}/build-interop
+        run: |
+          file build-interop/dotnet-native/AttoDesktopInterop
+          ./build-interop/dotnet-native/AttoDesktopInterop
   dotnet-windows:
     runs-on: windows-latest
     timeout-minutes: 25
@@ -90,6 +118,37 @@ jobs:
         env:
           DYLD_FALLBACK_LIBRARY_PATH: ${{ github.workspace }}/build-interop
         run: dotnet run -c Release --project interop/dotnet/AttoDesktopInterop.csproj
+  graalvm-native-image-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact source commit
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+        with:
+          distribution: graalvm
+          java-version: '25'
+      - run: cmake -S . -B build-interop -DATTO_DESKTOP_BUILD_SHARED=ON -DBUILD_TESTING=ON
+      - run: cmake --build build-interop --parallel 2
+      - name: Compile Java FFM host bridge
+        run: javac -d build-interop/ffm interop/graalvm/DesktopInteropProbe.java
+      - name: Build native-image with explicit foreign metadata, no fallback
+        run: |
+          command -v native-image
+          native-image --no-fallback --enable-native-access=ALL-UNNAMED \
+            -H:ConfigurationFileDirectories=interop/graalvm \
+            -cp build-interop/ffm DesktopInteropProbe \
+            -o build-interop/desktop-interop-native
+      - name: Execute GraalVM Native Image bridge (not an Atto guest)
+        run: |
+          file build-interop/desktop-interop-native
+          ./build-interop/desktop-interop-native "$PWD/build-interop/libores_desktop.so"
   graalvm-jdk25-linux:
     runs-on: ubuntu-24.04
     timeout-minutes: 25

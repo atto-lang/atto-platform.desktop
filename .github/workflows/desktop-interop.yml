@@ -3,15 +3,19 @@ on:
   push:
     paths:
       - 'CMakeLists.txt'
-      - 'src/ores_desktop.c'
-      - 'include/ores_desktop.h'
+      - 'src/**'
+      - 'include/**'
+      - 'tests/**'
+      - 'fixtures/**'
       - 'interop/**'
       - '.github/workflows/desktop-interop.yml'
   pull_request:
     paths:
       - 'CMakeLists.txt'
-      - 'src/ores_desktop.c'
-      - 'include/ores_desktop.h'
+      - 'src/**'
+      - 'include/**'
+      - 'tests/**'
+      - 'fixtures/**'
       - 'interop/**'
       - '.github/workflows/desktop-interop.yml'
   workflow_dispatch:
@@ -29,7 +33,10 @@ jobs:
       - name: Verify exact source commit
         env:
           EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          git rev-parse "HEAD^{tree}"
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
           dotnet-version: '10.0.x'
@@ -51,7 +58,10 @@ jobs:
       - name: Verify exact source commit
         env:
           EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          git rev-parse "HEAD^{tree}"
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
           dotnet-version: '10.0.x'
@@ -82,6 +92,8 @@ jobs:
           EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           if ((git rev-parse HEAD).Trim() -cne $env:EXPECTED) { throw "wrong commit" }
+          if ((git status --porcelain --untracked-files=all | Out-String).Trim().Length -ne 0) { throw "dirty source" }
+          git rev-parse "HEAD^{tree}"
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
           dotnet-version: '10.0.x'
@@ -107,7 +119,10 @@ jobs:
       - name: Verify exact source commit
         env:
           EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          git rev-parse "HEAD^{tree}"
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
           dotnet-version: '10.0.x'
@@ -129,7 +144,10 @@ jobs:
       - name: Verify exact source commit
         env:
           EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          git rev-parse "HEAD^{tree}"
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
           distribution: graalvm
@@ -160,7 +178,10 @@ jobs:
       - name: Verify exact source commit
         env:
           EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          git rev-parse "HEAD^{tree}"
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
           distribution: graalvm

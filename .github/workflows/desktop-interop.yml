@@ -1,0 +1,115 @@
+name: desktop-cross-runtime-ffi
+on:
+  push:
+    paths:
+      - 'CMakeLists.txt'
+      - 'src/ores_desktop.c'
+      - 'include/ores_desktop.h'
+      - 'interop/**'
+      - '.github/workflows/desktop-interop.yml'
+  pull_request:
+    paths:
+      - 'CMakeLists.txt'
+      - 'src/ores_desktop.c'
+      - 'include/ores_desktop.h'
+      - 'interop/**'
+      - '.github/workflows/desktop-interop.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dotnet-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact source commit
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: '10.0.x'
+      - run: cmake -S . -B build-interop -DATTO_DESKTOP_BUILD_SHARED=ON -DBUILD_TESTING=ON
+      - run: cmake --build build-interop --parallel 2
+      - run: ctest --test-dir build-interop --output-on-failure
+      - name: Execute .NET FFI lifecycle test
+        env:
+          LD_LIBRARY_PATH: ${{ github.workspace }}/build-interop
+        run: dotnet run -c Release --project interop/dotnet/AttoDesktopInterop.csproj
+  dotnet-windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact source commit
+        shell: pwsh
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if ((git rev-parse HEAD).Trim() -cne $env:EXPECTED) { throw "wrong commit" }
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: '10.0.x'
+      - shell: pwsh
+        run: |
+          cmake -S . -B build-interop -DATTO_DESKTOP_BUILD_SHARED=ON -DBUILD_TESTING=ON
+          if ($LASTEXITCODE -ne 0) { throw "cmake configure failed" }
+          cmake --build build-interop --config Release
+          if ($LASTEXITCODE -ne 0) { throw "cmake build failed" }
+          ctest --test-dir build-interop -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw "ctest failed" }
+          $env:PATH = "$PWD\build-interop\Release;" + $env:PATH
+          dotnet run -c Release --project interop/dotnet/AttoDesktopInterop.csproj
+          if ($LASTEXITCODE -ne 0) { throw ".NET FFI probe failed" }
+  dotnet-macos:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact source commit
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: '10.0.x'
+      - run: cmake -S . -B build-interop -DATTO_DESKTOP_BUILD_SHARED=ON -DBUILD_TESTING=ON
+      - run: cmake --build build-interop --parallel 2
+      - run: ctest --test-dir build-interop --output-on-failure
+      - name: Execute .NET FFI lifecycle test
+        env:
+          DYLD_FALLBACK_LIBRARY_PATH: ${{ github.workspace }}/build-interop
+        run: dotnet run -c Release --project interop/dotnet/AttoDesktopInterop.csproj
+  graalvm-jdk25-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact source commit
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+        with:
+          distribution: graalvm
+          java-version: '25'
+      - run: cmake -S . -B build-interop -DATTO_DESKTOP_BUILD_SHARED=ON -DBUILD_TESTING=ON
+      - run: cmake --build build-interop --parallel 2
+      - run: ctest --test-dir build-interop --output-on-failure
+      - name: Compile Java 25 FFM bridge
+        run: javac -d build-interop/ffm interop/graalvm/DesktopInteropProbe.java
+      - name: Execute Java/GraalVM FFM lifecycle test (JVM, not Native Image)
+        run: java --enable-native-access=ALL-UNNAMED -cp build-interop/ffm DesktopInteropProbe "$PWD/build-interop/libores_desktop.so"

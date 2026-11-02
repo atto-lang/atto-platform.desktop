@@ -1,8 +1,18 @@
 #ifndef ORES_DESKTOP_UI_MAILBOX_H
 #define ORES_DESKTOP_UI_MAILBOX_H
 
-#include <stdatomic.h>
 #include <stdint.h>
+
+/* MSVC's C11 atomics remain experimental; use Win32 Interlocked there.
+ * Other C11 compilers use 32-bit lock-free atomics. The mailbox struct
+ * is host-internal and its memory layout is NOT a stable foreign ABI. */
+#if defined(_MSC_VER) && !defined(__clang__)
+#include <windows.h>
+typedef volatile LONG ores_desktop_atomic_counter;
+#else
+#include <stdatomic.h>
+typedef _Atomic uint32_t ores_desktop_atomic_counter;
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -12,7 +22,8 @@ extern "C" {
  * The queue is not itself an AttoLang guest import, shared actor mailbox,
  * native window registry, or cross-language wire representation.
  * Do not copy or move this object once initialized and published.
- * Caller owns storage; there is no allocation, blocking, or OS access.
+ * Caller owns storage; there is no allocation or blocking during push/pop.
+ * On Windows, host synchronization uses Interlocked atomics.
  */
 #define ORES_DESKTOP_UI_MAILBOX_CAPACITY 64u
 
@@ -44,9 +55,9 @@ typedef struct {
 } ores_desktop_ui_message;
 
 typedef struct {
-    _Atomic uint64_t read_pos;
-    _Atomic uint64_t write_pos;
-    _Atomic int closed;
+    ores_desktop_atomic_counter read_pos;
+    ores_desktop_atomic_counter write_pos;
+    ores_desktop_atomic_counter closed;
     uint64_t actor_generation;
     ores_desktop_ui_message messages[ORES_DESKTOP_UI_MAILBOX_CAPACITY];
 } ores_desktop_ui_mailbox;

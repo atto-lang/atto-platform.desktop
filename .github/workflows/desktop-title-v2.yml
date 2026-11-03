@@ -1,0 +1,95 @@
+name: desktop-title-v2-native-host
+on:
+  pull_request:
+    paths:
+      - 'include/ores_desktop.h'
+      - 'src/ores_desktop.c'
+      - 'tests/test_desktop_title_v2.c'
+      - 'scripts/test-desktop-title-v2.sh'
+      - '.github/workflows/desktop-title-v2.yml'
+  push:
+    paths:
+      - 'include/ores_desktop.h'
+      - 'src/ores_desktop.c'
+      - 'tests/test_desktop_title_v2.c'
+      - 'scripts/test-desktop-title-v2.sh'
+      - '.github/workflows/desktop-title-v2.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact head and raw bytes for compiled sources
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          echo "source_tree=$(git rev-parse 'HEAD^{tree}')"
+          for path in include/ores_desktop.h src/ores_desktop.c tests/test_desktop_title_v2.c scripts/test-desktop-title-v2.sh; do
+            test -f "$path" && test ! -L "$path"
+            test "$(git hash-object --no-filters "$path")" = "$(git rev-parse "HEAD:$path")"
+          done
+      - name: Run length-exact UTF8 v2 C ABI test
+        shell: bash
+        env:
+          CC_NAME: ${{ matrix.compiler }}
+        run: bash scripts/test-desktop-title-v2.sh "$(command -v "$CC_NAME")"
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact head and compiled source blobs
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          echo "source_tree=$(git rev-parse 'HEAD^{tree}')"
+          for path in include/ores_desktop.h src/ores_desktop.c tests/test_desktop_title_v2.c scripts/test-desktop-title-v2.sh; do
+            test -f "$path" && test ! -L "$path"
+            test "$(git hash-object --no-filters "$path")" = "$(git rev-parse "HEAD:$path")"
+          done
+      - name: Run length-exact UTF8 v2 C ABI test
+        run: bash scripts/test-desktop-title-v2.sh "$(command -v clang)"
+  sanitizers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify source head
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          echo "source_tree=$(git rev-parse 'HEAD^{tree}')"
+      - name: Compile and run exact-title ABI under ASan/UBSan
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          set -euo pipefail
+          clang -std=c11 -g -O1 -Wall -Wextra -Wpedantic -Werror -fno-omit-frame-pointer \
+            -fsanitize=address,undefined -fno-sanitize-recover=all \
+            -Iinclude src/ores_desktop.c tests/test_desktop_title_v2.c -o /tmp/atto-title-v2-sanitized
+          /tmp/atto-title-v2-sanitized

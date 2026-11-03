@@ -17,8 +17,8 @@ static void *producer(void *arg) {
     fixture *f = (fixture*)arg;
     int i;
     for (i = 0; i < COUNT; i++) {
-        ores_desktop_ui_message message = {100, 1, 5,
-            ORES_DESKTOP_UI_REQUEST_REDRAW, i};
+        ores_desktop_ui_message message = {100, (uint64_t)i + 1u, 5,
+            ORES_DESKTOP_UI_REQUEST_REDRAW, 0};
         for (;;) {
             ores_desktop_ui_result r =
                 ores_desktop_ui_mailbox_push(&f->queue, &message);
@@ -48,10 +48,11 @@ static void *consumer(void *arg) {
             }
             sched_yield();
         }
-        if (message.actor_generation != 100 || message.window_id != 1 ||
+        if (message.actor_generation != 100 ||
+            message.window_id != (uint64_t)i + 1u ||
             message.window_generation != 5 ||
             message.command != ORES_DESKTOP_UI_REQUEST_REDRAW ||
-            message.value != i) {
+            message.value != 0) {
             atomic_store(&f->failure, 3);
             return NULL;
         }
@@ -70,17 +71,17 @@ static int wraparound_case(void) {
     atomic_store(&q.read_pos, UINT32_MAX - 1u);
     atomic_store(&q.write_pos, UINT32_MAX - 1u);
     for (i = 0; i < ORES_DESKTOP_UI_MAILBOX_CAPACITY; ++i) {
-        m = (ores_desktop_ui_message){401, 1, 1,
-            ORES_DESKTOP_UI_REQUEST_REDRAW, (int32_t)i};
+        m = (ores_desktop_ui_message){401, (uint64_t)i + 1u, 1,
+            ORES_DESKTOP_UI_REQUEST_REDRAW, 0};
         if (ores_desktop_ui_mailbox_push(&q, &m) !=
             ORES_DESKTOP_UI_ACCEPTED) return 2;
     }
-    m.value = 99;
+    m.window_id = 99;
     if (ores_desktop_ui_mailbox_push(&q, &m) !=
         ORES_DESKTOP_UI_FULL) return 3;
     for (i = 0; i < ORES_DESKTOP_UI_MAILBOX_CAPACITY; ++i) {
         if (ores_desktop_ui_mailbox_pop(&q, &out) !=
-            ORES_DESKTOP_UI_ACCEPTED || out.value != (int32_t)i)
+            ORES_DESKTOP_UI_ACCEPTED || out.window_id != (uint64_t)i + 1u)
             return 4;
     }
     return ores_desktop_ui_mailbox_pop(&q, &out) == ORES_DESKTOP_UI_EMPTY

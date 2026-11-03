@@ -2,6 +2,8 @@ name: desktop-cross-runtime-ffi
 on:
   push:
     paths:
+      - 'README.md'
+      - 'docs/**'
       - 'CMakeLists.txt'
       - 'src/**'
       - 'include/**'
@@ -11,6 +13,8 @@ on:
       - '.github/workflows/desktop-interop.yml'
   pull_request:
     paths:
+      - 'README.md'
+      - 'docs/**'
       - 'CMakeLists.txt'
       - 'src/**'
       - 'include/**'

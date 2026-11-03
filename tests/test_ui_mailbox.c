@@ -41,6 +41,14 @@ int main(void) {
     m.command = ORES_DESKTOP_UI_SET_VISIBILITY;
     m.value = 2;
     REQUIRE(ores_desktop_ui_mailbox_push(&q, &m) == ORES_DESKTOP_UI_INVALID);
+    /* Requests with no payload must reject smuggled values. */
+    m = message(1);
+    m.value = 17;
+    REQUIRE(ores_desktop_ui_mailbox_push(&q, &m) == ORES_DESKTOP_UI_INVALID);
+    m.command = ORES_DESKTOP_UI_REQUEST_CLOSE;
+    m.value = -1;
+    REQUIRE(ores_desktop_ui_mailbox_push(&q, &m) == ORES_DESKTOP_UI_INVALID);
+    m.command = ORES_DESKTOP_UI_SET_VISIBILITY;
     m.value = 1;
     REQUIRE(ores_desktop_ui_mailbox_push(&q, &m) == ORES_DESKTOP_UI_ACCEPTED);
     m.value = 0; /* Mutating the caller-owned struct cannot change queued copy. */
@@ -72,6 +80,10 @@ int main(void) {
     REQUIRE(ores_desktop_ui_mailbox_pop(&q, &out) == ORES_DESKTOP_UI_CLOSED);
     REQUIRE(out.actor_generation == UINT64_C(0x7f7f7f7f7f7f7f7f));
     REQUIRE(ores_desktop_ui_mailbox_push(&q, &m) == ORES_DESKTOP_UI_CLOSED);
+    /* Terminal close takes precedence over a stale but well-formed command. */
+    foreign = message(88);
+    foreign.actor_generation = 999;
+    REQUIRE(ores_desktop_ui_mailbox_push(&q, &foreign) == ORES_DESKTOP_UI_CLOSED);
     REQUIRE(ores_desktop_ui_mailbox_close(&q) == ORES_DESKTOP_UI_ACCEPTED);
     REQUIRE(ores_desktop_ui_mailbox_close(NULL) == ORES_DESKTOP_UI_INVALID);
     puts("desktop SPSC UI actor bridge: PASS (host-only)");

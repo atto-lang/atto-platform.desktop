@@ -71,6 +71,9 @@ public final class DesktopInteropProbe {
             MethodHandle run = LINKER.downcallHandle(
                     library.find("ores_desktop_run").orElseThrow(),
                     FunctionDescriptor.of(I32, PTR, PTR, PTR));
+            MethodHandle runV2 = LINKER.downcallHandle(
+                    library.find("ores_desktop_run_v2").orElseThrow(),
+                    FunctionDescriptor.of(I32, PTR, PTR, PTR));
 
             MemorySegment cfg = arena.allocate(CONFIG);
             cfg.set(I32, 0, 1); cfg.set(I32, 4, 800); cfg.set(I32, 8, 500);
@@ -100,7 +103,30 @@ public final class DesktopInteropProbe {
             check((int) run.invokeExact(cfg, app, backend) == 0, "Host run failed");
             check(opens == 1 && starts == 1 && frames == 2 && presents == 1 &&
                   stops == 1 && closes == 1 && polls == 2, "Lifecycle callback mismatch");
-            System.out.println("GraalVM/Java FFM host ABI v1: PASS (headless, not an Atto guest test)");
+            /* The v2 entry point takes an exact byte span: no source NUL and
+             * no Java-heap address may escape the confined Arena lifetime. */
+            MemorySegment v2 = arena.allocate(40, 8);
+            v2.set(I32, 0, 2); v2.set(I32, 4, 800); v2.set(I32, 8, 500);
+            v2.set(I32, 12, 8); v2.set(I64, 16, 4);
+            MemorySegment exact = arena.allocate(127, 1);
+            for (int i = 0; i < 127; ++i) exact.set(ValueLayout.JAVA_BYTE, i, (byte)'X');
+            v2.set(PTR, 24, exact); v2.set(I32, 32, 127);
+            v2.set(I32, 0, 1);
+            check((int) runV2.invokeExact(v2, app, backend) == 2 && opens == 1,
+                  "v2 wrong version must reject without callbacks");
+            v2.set(I32, 0, 2);
+            MemorySegment invalid = arena.allocate(2, 1);
+            invalid.set(ValueLayout.JAVA_BYTE, 0, (byte)0xc0);
+            invalid.set(ValueLayout.JAVA_BYTE, 1, (byte)0xaf);
+            v2.set(PTR, 24, invalid); v2.set(I32, 32, 2);
+            check((int) runV2.invokeExact(v2, app, backend) == 2 && opens == 1,
+                  "malformed UTF-8 must reject without callbacks");
+            v2.set(PTR, 24, exact); v2.set(I32, 32, 127);
+            check((int) runV2.invokeExact(v2, app, backend) == 0, "v2 host run failed");
+            check(opens == 2 && starts == 2 && frames == 4 &&
+                  presents == 2 && stops == 2 && closes == 2 && polls == 4,
+                  "v2 lifecycle callback mismatch");
+            System.out.println("GraalVM/Java FFM host ABI v1/v2: PASS (headless, not an Atto guest test)");
         }
     }
 }

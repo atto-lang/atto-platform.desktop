@@ -46,6 +46,16 @@ The `desktop-cross-runtime-ffi` workflow now additionally **attempts** actual Li
 
 If the GitHub Actions job has `steps=null`, those AOT steps **did not run**. Do not report any NativeAOT/Native Image pass until an exact-head executed-step job and binary receipt exist.
 
+## ABI exposure and mailbox audit (November 2026)
+
+The opt-in shared library deliberately exports **only** `ores_desktop_abi_version` and `ores_desktop_run`. The previous `WINDOWS_EXPORT_ALL_SYMBOLS` arrangement would also have exported host-internal C11 mailbox functions, falsely promoting unstable native struct layout to a permanent public DLL contract. Linux/Unix builds now compile the shared target with hidden default visibility and annotate the two published symbols; Windows uses explicit `__declspec(dllexport)`. Linux CTest checks the dynamic symbol allowlist, and must fail if future internal symbols leak.
+
+The SPSC UI mailbox enforces canonical message payloads: `REQUEST_REDRAW` and `REQUEST_CLOSE` require `value == 0`; only `SET_VISIBILITY` consumes `value`, and accepts only 0/1. Each mailbox is associated with one immutable actor generation. On terminal closure, valid commands return CLOSED instead of STALE/FULL when closure is observed; this is not a synchronization guarantee that a message racing with close was never executed **before** closure. Consumers must still check window generations and per-tenant capabilities at actual UI dispatch.
+
+Counter wraparound, 50,000-event FIFO ordering and post-close rejection are covered by the Linux threaded test. The fixed-capacity queue remains **single producer + single consumer**, not an actor MPSC system; never free/reinitialize its storage until all users have been joined or quiesced. Avoid passing the host-internal atomic layout to .NET/GraalVM foreign code; stable interop is limited to the two ABI v1 functions.
+
+The canonical extension for new AttoLang source is `.atto`; `fixtures/desktop_scalar_contract.atto` is a **source-only** scalar example, paired with a legacy `.ores` compatibility fixture. Neither has an admitted compiler-backed desktop GUI receipt.
+
 ## Stable source-level desktop API to build next
 
 Proposed package split (illustrative names, **not** accepted guest syntax):

@@ -1,0 +1,7 @@
+// Canonical new AttoLang extension. This is a source-level scalar
+// admission fixture only, NOT a desktop window or UI callback program.
+// Expected scalar return: 1300 (800 + 500).
+// Compiler support for .atto is not yet proven by a native test.
+define pub fnc main() : int {
+    return 800 + 500;
+}

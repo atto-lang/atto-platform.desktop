@@ -12,8 +12,11 @@ if(ATTO_DESKTOP_BUILD_SHARED)
   add_library(atto_desktop_shared SHARED src/ores_desktop.c src/ores_desktop_ui_mailbox.c)
   target_include_directories(atto_desktop_shared PUBLIC include)
   target_compile_features(atto_desktop_shared PUBLIC c_std_11)
+  target_compile_definitions(atto_desktop_shared PRIVATE ORES_DESKTOP_SHARED_BUILD=1)
+  # Internal runtime helpers must not accidentally enter the public DLL/DSO ABI.
   set_target_properties(atto_desktop_shared PROPERTIES OUTPUT_NAME ores_desktop
-    WINDOWS_EXPORT_ALL_SYMBOLS ON)
+    C_VISIBILITY_PRESET hidden
+    WINDOWS_EXPORT_ALL_SYMBOLS OFF)
   if(MSVC)
     target_compile_options(atto_desktop_shared PRIVATE /W4 /WX)
   else()

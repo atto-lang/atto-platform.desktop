@@ -1,6 +1,7 @@
 #ifndef ORES_DESKTOP_H
 #define ORES_DESKTOP_H
 #include <stdint.h>
+#include <stddef.h>
 /* Explicit, minimal shared-library ABI: never export host-internal mailbox
  * primitives. Static linking needs no annotation. */
 #if defined(ORES_DESKTOP_SHARED_BUILD)
@@ -19,6 +20,8 @@ extern "C" {
 #endif
 /* HOST C ABI only: not yet callable from general Oreslang guest code. */
 #define ORES_DESKTOP_ABI_VERSION 1u
+/* Additive, length-exact caller ABI. Never change the v1 struct in place. */
+#define ORES_DESKTOP_TITLE_ABI_V2 2u
 typedef enum {
     ORES_DESKTOP_OK=0, ORES_DESKTOP_STOP=1,
     ORES_DESKTOP_INVALID_ARGUMENT=2, ORES_DESKTOP_BACKEND_ERROR=3,
@@ -40,6 +43,18 @@ typedef struct {
     uint64_t frame_limit; /* 0 means unbounded */
     const char *title;    /* borrowed, NUL terminated, <=127 bytes */
 } ores_desktop_config;
+/* V2 caller envelope: title is an exact UTF-8 byte span (no NUL required).
+ * Bounds: 1..127 bytes, no embedded NUL, RFC 3629 well-formed scalars.
+ * This is a process-local native C ABI, NOT a cross-process wire layout.
+ * Backends still receive a snapshotted v1 config in their open callback.
+ * Caller must keep the source title bytes readable for title_length bytes.
+ */
+typedef struct {
+    uint32_t abi_version, width, height, max_events_per_frame;
+    uint64_t frame_limit;
+    const char *title;
+    uint32_t title_length;
+} ores_desktop_config_v2;
 /* Borrowed callback event pointer expires on return. Return OK or STOP only.
  * The host honors the original polled QUIT event even if callback code
  * improperly casts away const and mutates the event object. */
@@ -63,6 +78,14 @@ ORES_DESKTOP_API uint32_t ores_desktop_abi_version(void);
 ORES_DESKTOP_API ores_desktop_status ores_desktop_run(const ores_desktop_config *,
                                     const ores_desktop_app *,
                                     const ores_desktop_backend *);
+/* Compatible additive entry point. Wrong version, invalid UTF-8, embedded NUL,
+ * or out-of-bounds title rejects before any application/backend callback.
+ * This function must NOT allow nonterminated input to reach v1's bounded scan.
+ */
+ORES_DESKTOP_API ores_desktop_status ores_desktop_run_v2(
+    const ores_desktop_config_v2 *,
+    const ores_desktop_app *,
+    const ores_desktop_backend *);
 #ifdef __cplusplus
 }
 #endif

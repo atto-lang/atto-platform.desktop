@@ -37,6 +37,12 @@ if(ORES_DESKTOP_WITH_SDL3)
   target_link_libraries(ores_desktop_demo PRIVATE ores_desktop_sdl3)
 endif()
 if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
+  if(ATTO_DESKTOP_BUILD_SHARED AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME desktop_shared_export_allowlist
+      COMMAND /bin/sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/check-shared-exports.sh
+      ${CMAKE_NM} $<TARGET_FILE:atto_desktop_shared>)
+    set_tests_properties(desktop_shared_export_allowlist PROPERTIES TIMEOUT 10)
+  endif()
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(Threads REQUIRED)
     add_executable(test_ui_mailbox_threads tests/test_ui_mailbox_threads.c)

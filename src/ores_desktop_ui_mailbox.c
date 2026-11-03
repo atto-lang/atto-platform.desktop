@@ -50,22 +50,27 @@ static int valid_message(const ores_desktop_ui_message *m) {
     if (!m || !m->window_id || !m->window_generation) return 0;
     if (m->command == ORES_DESKTOP_UI_SET_VISIBILITY)
         return m->value == 0 || m->value == 1;
-    return m->command == ORES_DESKTOP_UI_REQUEST_REDRAW ||
-           m->command == ORES_DESKTOP_UI_REQUEST_CLOSE;
+    /* Requests without an integer payload must be encoded canonically.
+     * Reject hidden/trailing data rather than forward it to a future UI layer. */
+    if (m->command == ORES_DESKTOP_UI_REQUEST_REDRAW ||
+        m->command == ORES_DESKTOP_UI_REQUEST_CLOSE)
+        return m->value == 0;
+    return 0;
 }
 
 ores_desktop_ui_result ores_desktop_ui_mailbox_push(
     ores_desktop_ui_mailbox *q, const ores_desktop_ui_message *msg) {
     uint32_t writer, reader;
     if (!q || !valid_message(msg)) return ORES_DESKTOP_UI_INVALID;
-    if (msg->actor_generation != q->actor_generation)
-        return ORES_DESKTOP_UI_STALE;
     if (read_counter(&q->closed))
         return ORES_DESKTOP_UI_CLOSED;
+    if (msg->actor_generation != q->actor_generation)
+        return ORES_DESKTOP_UI_STALE;
     writer = read_counter(&q->write_pos);
     reader = read_counter(&q->read_pos);
     if (writer - reader >= ORES_DESKTOP_UI_MAILBOX_CAPACITY)
-        return ORES_DESKTOP_UI_FULL;
+        return read_counter(&q->closed) ? ORES_DESKTOP_UI_CLOSED
+                                        : ORES_DESKTOP_UI_FULL;
     q->messages[writer % ORES_DESKTOP_UI_MAILBOX_CAPACITY] = *msg;
     write_counter(&q->write_pos, writer + 1);
     return read_counter(&q->closed)
@@ -81,7 +86,9 @@ ores_desktop_ui_result ores_desktop_ui_mailbox_pop(
         return ORES_DESKTOP_UI_CLOSED;
     reader = read_counter(&q->read_pos);
     writer = read_counter(&q->write_pos);
-    if (reader == writer) return ORES_DESKTOP_UI_EMPTY;
+    if (reader == writer)
+        return read_counter(&q->closed) ? ORES_DESKTOP_UI_CLOSED
+                                        : ORES_DESKTOP_UI_EMPTY;
     snapshot = q->messages[reader % ORES_DESKTOP_UI_MAILBOX_CAPACITY];
     write_counter(&q->read_pos, reader + 1);
     if (read_counter(&q->closed))

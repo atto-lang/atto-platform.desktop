@@ -14,6 +14,16 @@ unsafe struct Config
     public byte* Title;
 }
 
+// Additive title ABI v2: fixed uint32 length, not native size_t.
+[StructLayout(LayoutKind.Sequential)]
+unsafe struct ConfigV2
+{
+    public uint AbiVersion, Width, Height, MaxEventsPerFrame;
+    public ulong FrameLimit;
+    public byte* Title;
+    public uint TitleLength;
+}
+
 [StructLayout(LayoutKind.Sequential)]
 unsafe struct App
 {
@@ -49,6 +59,10 @@ internal static unsafe partial class Native
     [LibraryImport("ores_desktop", EntryPoint = "ores_desktop_run")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     internal static partial int Run(Config* config, App* app, Backend* backend);
+
+    [LibraryImport("ores_desktop", EntryPoint = "ores_desktop_run_v2")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    internal static partial int RunV2(ConfigV2* config, App* app, Backend* backend);
 }
 
 internal static unsafe class Program
@@ -94,7 +108,7 @@ internal static unsafe class Program
     private static int Main()
     {
         if (IntPtr.Size != 8 || sizeof(Config) != 32 || sizeof(App) != 40 ||
-            sizeof(Backend) != 40 || Native.Version() != 1)
+            sizeof(Backend) != 40 || sizeof(ConfigV2) != 40 || Native.Version() != 1)
             throw new InvalidOperationException("Unsupported desktop host ABI/layout");
 
         byte[] title = Encoding.UTF8.GetBytes("AttoLang .NET desktop interop\0");
@@ -114,8 +128,33 @@ internal static unsafe class Program
                 stats.Opens != 1 || stats.Starts != 1 || stats.Frames != 2 ||
                 stats.Presents != 1 || stats.Stops != 1 || stats.Closes != 1 || stats.Polls != 2)
                 throw new InvalidOperationException("Host callback lifecycle mismatch");
+
+            byte[] exactTitle = new byte[127];
+            Array.Fill(exactTitle, (byte)'X'); // No source terminator.
+            byte[] malformedTitle = { 0xc0, 0xaf }; // Overlong invalid UTF-8.
+            fixed (byte* exactPtr = exactTitle, badPtr = malformedTitle)
+            {
+                ConfigV2 v2 = new() { AbiVersion = 2, Width = 800, Height = 500,
+                    MaxEventsPerFrame = 8, FrameLimit = 4, Title = exactPtr,
+                    TitleLength = (uint)exactTitle.Length };
+                v2.AbiVersion = 1;
+                if (Native.RunV2(&v2, &app, &backend) != 2 || stats.Opens != 1)
+                    throw new InvalidOperationException("v2 version mismatch was admitted");
+                v2.AbiVersion = 2;
+                v2.Title = badPtr;
+                v2.TitleLength = (uint)malformedTitle.Length;
+                if (Native.RunV2(&v2, &app, &backend) != 2 || stats.Opens != 1)
+                    throw new InvalidOperationException("malformed v2 title was admitted");
+                v2.Title = exactPtr;
+                v2.TitleLength = (uint)exactTitle.Length;
+                if (Native.RunV2(&v2, &app, &backend) != 0 ||
+                    stats.Opens != 2 || stats.Starts != 2 || stats.Frames != 4 ||
+                    stats.Presents != 2 || stats.Stops != 2 || stats.Closes != 2 ||
+                    stats.Polls != 4)
+                    throw new InvalidOperationException("v2 callback lifecycle mismatch");
+            }
         }
-        Console.WriteLine(".NET host ABI v1: PASS (headless, not an Atto guest test)");
+        Console.WriteLine(".NET host ABI v1/v2: PASS (headless, not an Atto guest test)");
         return 0;
     }
 }

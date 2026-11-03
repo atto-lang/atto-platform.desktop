@@ -1,6 +1,19 @@
 #ifndef ORES_DESKTOP_H
 #define ORES_DESKTOP_H
 #include <stdint.h>
+/* Explicit, minimal shared-library ABI: never export host-internal mailbox
+ * primitives. Static linking needs no annotation. */
+#if defined(ORES_DESKTOP_SHARED_BUILD)
+#  if defined(_WIN32)
+#    define ORES_DESKTOP_API __declspec(dllexport)
+#  elif defined(__GNUC__) || defined(__clang__)
+#    define ORES_DESKTOP_API __attribute__((visibility("default")))
+#  else
+#    error "Explicit exports required for this shared-library toolchain"
+#  endif
+#else
+#  define ORES_DESKTOP_API
+#endif
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -45,9 +58,9 @@ typedef struct {
     ores_desktop_status (*present)(void *);
     void (*close)(void *);
 } ores_desktop_backend;
-uint32_t ores_desktop_abi_version(void);
+ORES_DESKTOP_API uint32_t ores_desktop_abi_version(void);
 /* Single-threaded UI loop. Successful open always gets one close. */
-ores_desktop_status ores_desktop_run(const ores_desktop_config *,
+ORES_DESKTOP_API ores_desktop_status ores_desktop_run(const ores_desktop_config *,
                                     const ores_desktop_app *,
                                     const ores_desktop_backend *);
 #ifdef __cplusplus

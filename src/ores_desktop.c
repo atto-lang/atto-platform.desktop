@@ -1,14 +1,15 @@
 #include "ores_desktop.h"
 #include <stddef.h>
 uint32_t ores_desktop_abi_version(void) { return ORES_DESKTOP_ABI_VERSION; }
-static int snapshot_title(const char *source, char destination[128]) {
+static int snapshot_title(const char *source, size_t length, char destination[128]) {
     size_t i;
-    if (!source) return 0;
-    for (i=0; i<=127; ++i) {
+    if (!source || length == 0 || length > 127) return 0;
+    for (i=0; i<length; ++i) {
+        if (source[i]=='\0') return 0; /* reject ambiguous/truncated UI titles */
         destination[i]=source[i];
-        if (source[i]=='\0') return i>0;
     }
-    return 0;
+    destination[length]='\0';
+    return 1;
 }
 static int valid_status(ores_desktop_status s) {
     return s==ORES_DESKTOP_OK || s==ORES_DESKTOP_STOP;
@@ -36,7 +37,7 @@ ores_desktop_status ores_desktop_run(const ores_desktop_config *c,
     if (cfg.abi_version!=ORES_DESKTOP_ABI_VERSION ||
         !cfg.width || cfg.width>16384 || !cfg.height || cfg.height>16384 ||
         !cfg.max_events_per_frame || cfg.max_events_per_frame>256 ||
-        !snapshot_title(cfg.title,title) ||
+        !snapshot_title(cfg.title,cfg.title_length,title) ||
         (!app.on_start && !app.on_event && !app.on_frame) ||
         !backend.open || !backend.poll || !backend.present || !backend.close)
         return ORES_DESKTOP_INVALID_ARGUMENT;

@@ -26,7 +26,7 @@ typedef struct {
 typedef struct {
     uint32_t abi_version, width, height, max_events_per_frame;
     uint64_t frame_limit; /* 0 means unbounded */
-    const char *title;    /* borrowed exact bytes; host snapshots + terminates */
+    const char *title;    /* borrowed UTF-8 without controls; host snapshots + terminates */
     size_t title_length;  /* 1..127; source need not be NUL terminated */
 } ores_desktop_config;
 /* Borrowed callback event pointer expires on return. Return OK or STOP only.

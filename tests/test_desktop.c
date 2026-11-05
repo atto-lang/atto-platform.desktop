@@ -134,8 +134,9 @@ static void bad_arguments(void) {
         const char surrogate[]={(char)0xed,(char)0xa0,(char)0x80};
         const char too_high[]={(char)0xf4,(char)0x90,(char)0x80,(char)0x80};
         const char stray[]={(char)0x80};
-        const char *invalid[]={overlong,partial,surrogate,too_high,stray};
-        const size_t sizes[]={2u,2u,3u,4u,1u};
+        const char c1_control[]={(char)0xc2,(char)0x85};
+        const char *invalid[]={overlong,partial,surrogate,too_high,stray,c1_control};
+        const size_t sizes[]={2u,2u,3u,4u,1u,2u};
         size_t i;
         for (i=0;i<sizeof(sizes)/sizeof(sizes[0]);++i) {
             c.title=invalid[i]; c.title_length=sizes[i];

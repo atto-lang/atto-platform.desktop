@@ -126,7 +126,28 @@ static void bad_arguments(void) {
     CHECK(ores_desktop_run(&c,&a,&b)==ORES_DESKTOP_INVALID_ARGUMENT);
     c.title="A\0B"; c.title_length=3;
     CHECK(ores_desktop_run(&c,&a,&b)==ORES_DESKTOP_INVALID_ARGUMENT);
+    c.title="A\nB"; c.title_length=3;
+    CHECK(ores_desktop_run(&c,&a,&b)==ORES_DESKTOP_INVALID_ARGUMENT);
+    {
+        const char overlong[]={(char)0xc0,(char)0x80};
+        const char partial[]={(char)0xe2,(char)0x82};
+        const char surrogate[]={(char)0xed,(char)0xa0,(char)0x80};
+        const char too_high[]={(char)0xf4,(char)0x90,(char)0x80,(char)0x80};
+        const char stray[]={(char)0x80};
+        const char *invalid[]={overlong,partial,surrogate,too_high,stray};
+        const size_t sizes[]={2u,2u,3u,4u,1u};
+        size_t i;
+        for (i=0;i<sizeof(sizes)/sizeof(sizes[0]);++i) {
+            c.title=invalid[i]; c.title_length=sizes[i];
+            CHECK(ores_desktop_run(&c,&a,&b)==ORES_DESKTOP_INVALID_ARGUMENT);
+        }
+    }
     CHECK(f.opens==0);
+    /* Valid non-ASCII UTF-8 must remain supported by the real host ABI. */
+    c.title="\xc3\xa9"; c.title_length=2; c.frame_limit=1;
+    f.live_config=&c;
+    CHECK(ores_desktop_run(&c,&a,&b)==ORES_DESKTOP_OK);
+    CHECK(f.opens==1 && f.closes==1);
 }
 int main(void) {
     CHECK(ores_desktop_abi_version()==ORES_DESKTOP_ABI_VERSION);

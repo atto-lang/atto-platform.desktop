@@ -39,7 +39,7 @@ static ores_desktop_status frame_app(void *x,uint64_t frame){(void)x;CHECK(frame
 static void stop_app(void *x){(void)x;++app.stops;}
 static ores_desktop_status execute(ores_desktop_sdl3_state *s,unsigned frames){
  ores_desktop_backend b=ores_desktop_sdl3_backend(s);
- ores_desktop_config cfg={ORES_DESKTOP_ABI_VERSION,320,240,2,frames,"mock SDL3"};
+ ores_desktop_config cfg={ORES_DESKTOP_ABI_VERSION,320,240,2,frames,"mock SDL3",9};
  ores_desktop_app a={NULL,start_app,event_app,frame_app,stop_app};
  return ores_desktop_run(&cfg,&a,&b);
 }

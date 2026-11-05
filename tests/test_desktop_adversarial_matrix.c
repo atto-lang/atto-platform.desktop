@@ -47,7 +47,7 @@ static ores_desktop_status expected(test_state *s) {
  return s->present_s==0 ? ORES_DESKTOP_OK : ORES_DESKTOP_BACKEND_ERROR;
 }
 static void run_one(test_state *s) {
- ores_desktop_config cfg={ORES_DESKTOP_ABI_VERSION,128,256,1,1,"matrix"};
+ ores_desktop_config cfg={ORES_DESKTOP_ABI_VERSION,128,256,1,1,"matrix",6};
  ores_desktop_app a={s,start_a,event_a,frame_a,stop_a};
  ores_desktop_backend b={s,open_b,poll_b,present_b,close_b};
  ores_desktop_status want=expected(s),got=ores_desktop_run(&cfg,&a,&b);

@@ -21,7 +21,7 @@ static int valid_utf8_title(const char *s, size_t length) {
         {
             unsigned char second=(unsigned char)s[i+1];
             if ((c==0xc2 && second>=0x80 && second<=0x9f) ||
-                ((c==0xe0 && second<0xa0) ||
+                (c==0xe0 && second<0xa0) ||
                 (c==0xed && second>0x9f) ||
                 (c==0xf0 && second<0x90) ||
                 (c==0xf4 && second>0x8f)) return 0;

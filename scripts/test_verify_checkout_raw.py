@@ -248,4 +248,32 @@ class Check(unittest.TestCase):
    self.assertEqual(result.returncode,1,(result.stdout,result.stderr))
    self.assertIn('index does not match',result.stderr)
 
+ @unittest.skipUnless(sys.platform.startswith('linux'), 'Linux case alias fixture')
+ def test_untracked_filename_case_alias_not_hidden_by_git_config(self):
+  if (self.root/'ONE.C').exists():
+   self.skipTest('requires case-sensitive filesystem')
+  self.git('config','core.ignorecase','true')
+  (self.root/'ONE.C').write_bytes(b'physically untracked alias\\n')
+  self.assertEqual(self.git('ls-files','--others','--exclude-standard'),'',
+                   'negative control: hostile ignorecase failed to hide alias')
+  self.assertIn('ONE.C',self.git('-c','core.ignorecase=false','ls-files','--others','--exclude-standard'))
+  self.expect_denied()
+
+ @unittest.skipUnless(sys.platform.startswith('linux'), 'Linux case alias fixture')
+ def test_untracked_parent_case_alias_not_hidden_by_git_config(self):
+  (self.root/'src').mkdir()
+  (self.root/'src'/'trusted.atto').write_bytes(b'trusted\\n')
+  self.git('add','src/trusted.atto')
+  self.git('commit','-qm','tracked nested source')
+  self.head=self.git('rev-parse','HEAD')
+  if (self.root/'SRC').exists():
+   self.skipTest('requires case-sensitive filesystem')
+  self.git('config','core.ignorecase','true')
+  (self.root/'SRC').mkdir()
+  (self.root/'SRC'/'trusted.atto').write_bytes(b'physically untracked alias\\n')
+  self.assertEqual(self.git('ls-files','--others','--exclude-standard'),'',
+                   'negative control: hostile ignorecase failed to hide parent alias')
+  self.assertIn('SRC/trusted.atto',self.git('-c','core.ignorecase=false','ls-files','--others','--exclude-standard'))
+  self.expect_denied()
+
 if __name__=='__main__': unittest.main()

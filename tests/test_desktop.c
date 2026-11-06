@@ -287,7 +287,7 @@ static void title_invisible_only_matrix(void) {
     check_title_bytes("\xe2\x80\x8c\xef\xb8\x8f\xe3\x85\xa4",9,0);
     check_title_bytes("\xe2\x80\x8d\xe2\x80\x8d",6,0);
     check_title_bytes("\xef\xb8\x8f\xef\xb8\x8f",6,0);
-    check_title_bytes("\xe2\x80\x8dAtto",7,1);
+    check_title_bytes("\xe2\x80\x8d" "Atto",7,1);
     check_title_bytes("Atto\xe2\x80\x8c",7,1);
     check_title_bytes("\xd8\xa7\xe2\x80\x8c\xd9\x84",7,1); /* Arabic with ZWNJ */
     check_title_bytes("\xe2\x9d\xa4\xef\xb8\x8f",6,1);     /* heart + VS16 */

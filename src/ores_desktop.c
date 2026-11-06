@@ -26,6 +26,20 @@ static int valid_utf8_title(const char *s, size_t length) {
                 (c==0xf0 && second<0x90) ||
                 (c==0xf4 && second>0x8f)) return 0;
         }
+        /* Reject visual spoofing controls after validating the complete UTF-8
+         * scalar. Keep ordinary RTL letters and U+200D emoji joiners valid. */
+        {
+            unsigned int scalar=c & (extra==1 ? 0x1fu : extra==2 ? 0x0fu : 0x07u);
+            for (j=1;j<=extra;++j) {
+                scalar=(scalar<<6) | ((unsigned char)s[i+j] & 0x3fu);
+            }
+            if (scalar==0x00adu || scalar==0x034fu || scalar==0x061cu ||
+                scalar==0x180eu || scalar==0x200bu ||
+                scalar==0x200eu || scalar==0x200fu ||
+                (scalar>=0x2028u && scalar<=0x202eu) ||
+                (scalar>=0x2060u && scalar<=0x206fu) ||
+                scalar==0xfeffu) return 0;
+        }
         i+=extra+1;
     }
     return 1;

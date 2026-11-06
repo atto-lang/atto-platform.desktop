@@ -27,7 +27,8 @@ static ores_desktop_status frame(void *context,uint64_t number) {
 int main(void) {
     int64_t w=desktop_initial_width(),h=desktop_initial_height();
     state s={0};
-    ores_desktop_config c={ORES_DESKTOP_ABI_VERSION,0,0,16,1,"LLVM native guest linkage"};
+    static const char title[]="LLVM native guest linkage";
+    ores_desktop_config c={ORES_DESKTOP_ABI_VERSION,0,0,16,1,title,sizeof title-1u};
     ores_desktop_app a={0};
     ores_desktop_backend b={0};
     if (w<1 || w>16384 || h<1 || h>16384) return 2;

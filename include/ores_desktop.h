@@ -1,11 +1,12 @@
 #ifndef ORES_DESKTOP_H
 #define ORES_DESKTOP_H
+#include <stddef.h>
 #include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
 /* HOST C ABI only: not yet callable from general Oreslang guest code. */
-#define ORES_DESKTOP_ABI_VERSION 1u
+#define ORES_DESKTOP_ABI_VERSION 2u
 typedef enum {
     ORES_DESKTOP_OK=0, ORES_DESKTOP_STOP=1,
     ORES_DESKTOP_INVALID_ARGUMENT=2, ORES_DESKTOP_BACKEND_ERROR=3,
@@ -25,7 +26,8 @@ typedef struct {
 typedef struct {
     uint32_t abi_version, width, height, max_events_per_frame;
     uint64_t frame_limit; /* 0 means unbounded */
-    const char *title;    /* borrowed, NUL terminated, <=127 bytes */
+    const char *title;    /* borrowed exact bytes; host snapshots + terminates */
+    size_t title_length;  /* 1..127; source need not be NUL terminated */
 } ores_desktop_config;
 /* Borrowed callback event pointer expires on return. Return OK or STOP only.
  * The host honors the original polled QUIT event even if callback code

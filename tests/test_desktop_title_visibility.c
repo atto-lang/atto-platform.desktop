@@ -58,6 +58,16 @@ int main(void) {
     VERIFY("\xe2\x80\x8c\xe2\x80\x8d",0); /* only two invisibles */
     VERIFY("\xef\xb8\x8f\xe3\x85\xa4",0); /* mixed invisibles */
     VERIFY("\xe2\x80\x8d\xe2\x80\x8d",0); /* repeated ZWJ */
+    /* Non-DI Unicode blanks must not pass as stand-alone visible titles. */
+    VERIFY("\xe2\xa0\x80",0); /* U+2800 braille pattern blank */
+    VERIFY("\xe2\x80\x80",0); /* U+2000 en quad */
+    VERIFY("\xe2\x80\x83",0); /* U+2003 em space */
+    VERIFY("\xe2\x80\x8a",0); /* U+200A hair space */
+    VERIFY("\xe2\x80\xaf",0); /* U+202F narrow no-break space */
+    VERIFY("\xe2\x81\x9f",0); /* U+205F medium mathematical space */
+    VERIFY("\xe3\x80\x80",0); /* U+3000 ideographic space */
+    VERIFY("A\xe2\xa0\x80",1); /* visible letter + Braille blank */
+    VERIFY("A\xe2\x80\x80",1); /* visible letter + en quad */
     /* Existing rejection policy remains fail closed even with visible letters. */
     VERIFY("A\xe2\x80\xae",0); /* bidi override */
     VERIFY("A\xe2\x80\x8b",0); /* zero width space */

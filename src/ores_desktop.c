@@ -1,14 +1,33 @@
 #include "ores_desktop.h"
 #include <stddef.h>
 uint32_t ores_desktop_abi_version(void) { return ORES_DESKTOP_ABI_VERSION; }
+/* This is a deliberately bounded invisible-scalar classifier, NOT a Unicode
+ * renderer or complete Default_Ignorable_Code_Point implementation. The title
+ * must contain a non-ignorable scalar, while ZWNJ/ZWJ/VS remain valid inside
+ * visible Arabic/Persian/emoji sequences. Preserve existing U+00A0 behavior. */
+static int title_format_only(unsigned int scalar) {
+    return (scalar>=0x115fu && scalar<=0x1160u) ||
+           (scalar>=0x17b4u && scalar<=0x17b5u) ||
+           (scalar>=0x180bu && scalar<=0x180du) || scalar==0x180fu ||
+           (scalar>=0x200cu && scalar<=0x200du) ||
+           scalar==0x3164u ||
+           (scalar>=0xfe00u && scalar<=0xfe0fu) ||
+           scalar==0xffa0u ||
+           (scalar>=0x1bca0u && scalar<=0x1bca3u) ||
+           (scalar>=0x1d173u && scalar<=0x1d17au) ||
+           (scalar>=0xe0000u && scalar<=0xe0fffu) ||
+           (scalar>=0xe0100u && scalar<=0xe01efu);
+}
 /* SDL3 window titles must be complete UTF-8 scalar strings. */
 static int valid_utf8_title(const char *s, size_t length) {
     size_t i=0;
+    int has_non_ignorable=0;
     while (i<length) {
         unsigned char c=(unsigned char)s[i];
         size_t extra, j;
         if (c<0x20 || c==0x7f) return 0;
-        if (c<0x80) { ++i; continue; }
+        /* ASCII space is intentionally preserved by the existing title ABI. */
+        if (c<0x80) { has_non_ignorable=1; ++i; continue; }
         if (c>=0xc2 && c<=0xdf) extra=1;
         else if (c>=0xe0 && c<=0xef) extra=2;
         else if (c>=0xf0 && c<=0xf4) extra=3;
@@ -39,10 +58,11 @@ static int valid_utf8_title(const char *s, size_t length) {
                 (scalar>=0x2028u && scalar<=0x202eu) ||
                 (scalar>=0x2060u && scalar<=0x206fu) ||
                 scalar==0xfeffu) return 0;
+            if (!title_format_only(scalar)) has_non_ignorable=1;
         }
         i+=extra+1;
     }
-    return 1;
+    return has_non_ignorable;
 }
 static int snapshot_title(const char *source, size_t length, char destination[128]) {
     size_t i;

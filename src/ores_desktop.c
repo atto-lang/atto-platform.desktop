@@ -1,14 +1,33 @@
 #include "ores_desktop.h"
 #include <stddef.h>
 uint32_t ores_desktop_abi_version(void) { return ORES_DESKTOP_ABI_VERSION; }
+/* Deliberately bounded, host-ABI-only visible-anchor policy: these scalars
+ * cannot make an otherwise empty title visible by themselves. They remain
+ * legal inside a title containing other text (e.g. ZWNJ in Persian, VS16
+ * after emoji, ZWJ emoji sequences). This is not a Unicode render/shaping
+ * engine or a complete Unicode Default_Ignorable_Code_Point table.
+ * Preserve the existing U+00A0 compatibility behavior. */
+static int title_only_modifier(unsigned int scalar) {
+    return scalar==0x115fu || scalar==0x1160u ||
+           (scalar>=0x17b4u && scalar<=0x17b5u) ||
+           (scalar>=0x180bu && scalar<=0x180du) || scalar==0x180fu ||
+           scalar==0x200cu || scalar==0x200du ||
+           scalar==0x2800u || scalar==0x3164u || scalar==0xffa0u ||
+           (scalar>=0xfe00u && scalar<=0xfe0fu) ||
+           (scalar>=0xfff9u && scalar<=0xfffbu) ||
+           (scalar>=0x1bca0u && scalar<=0x1bca3u) ||
+           (scalar>=0xe0000u && scalar<=0xe007fu) ||
+           (scalar>=0xe0100u && scalar<=0xe01efu);
+}
 /* SDL3 window titles must be complete UTF-8 scalar strings. */
 static int valid_utf8_title(const char *s, size_t length) {
     size_t i=0;
+    int has_visible_anchor=0;
     while (i<length) {
         unsigned char c=(unsigned char)s[i];
         size_t extra, j;
         if (c<0x20 || c==0x7f) return 0;
-        if (c<0x80) { ++i; continue; }
+        if (c<0x80) { has_visible_anchor=1; ++i; continue; }
         if (c>=0xc2 && c<=0xdf) extra=1;
         else if (c>=0xe0 && c<=0xef) extra=2;
         else if (c>=0xf0 && c<=0xf4) extra=3;
@@ -39,10 +58,11 @@ static int valid_utf8_title(const char *s, size_t length) {
                 (scalar>=0x2028u && scalar<=0x202eu) ||
                 (scalar>=0x2060u && scalar<=0x206fu) ||
                 scalar==0xfeffu) return 0;
+            if (!title_only_modifier(scalar)) has_visible_anchor=1;
         }
         i+=extra+1;
     }
-    return 1;
+    return has_visible_anchor;
 }
 static int snapshot_title(const char *source, size_t length, char destination[128]) {
     size_t i;

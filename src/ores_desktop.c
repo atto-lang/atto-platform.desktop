@@ -6,7 +6,12 @@ uint32_t ores_desktop_abi_version(void) { return ORES_DESKTOP_ABI_VERSION; }
  * must contain a non-ignorable scalar, while ZWNJ/ZWJ/VS remain valid inside
  * visible Arabic/Persian/emoji sequences. Preserve existing U+00A0 behavior. */
 static int title_format_only(unsigned int scalar) {
-    return (scalar>=0x115fu && scalar<=0x1160u) ||
+    /* Unicode whitespace rendering can leave a title blank even when
+     * its scalar is not Default_Ignorable. Preserve legacy U+00A0. */
+    return (scalar>=0x2000u && scalar<=0x200au) ||
+           scalar==0x202fu || scalar==0x205fu || scalar==0x2800u ||
+           scalar==0x3000u ||
+           (scalar>=0x115fu && scalar<=0x1160u) ||
            (scalar>=0x17b4u && scalar<=0x17b5u) ||
            (scalar>=0x180bu && scalar<=0x180du) || scalar==0x180fu ||
            (scalar>=0x200cu && scalar<=0x200du) ||
@@ -67,13 +72,14 @@ static int valid_utf8_title(const char *s, size_t length) {
 static int snapshot_title(const char *source, size_t length, char destination[128]) {
     size_t i;
     if (!source || length == 0 || length > 127) return 0;
-    if (!valid_utf8_title(source,length)) return 0;
+    /* Validate the immutable local copy: never validate caller bytes and
+     * then hand different bytes to the backend. Callers must still keep the
+     * borrowed source readable/stable during this call. */
     for (i=0; i<length; ++i) {
-        if (source[i]=='\0') return 0; /* reject ambiguous/truncated UI titles */
         destination[i]=source[i];
     }
     destination[length]='\0';
-    return 1;
+    return valid_utf8_title(destination,length);
 }
 static int valid_status(ores_desktop_status s) {
     return s==ORES_DESKTOP_OK || s==ORES_DESKTOP_STOP;

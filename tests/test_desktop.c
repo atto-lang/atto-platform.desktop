@@ -210,6 +210,41 @@ static void title_boundary_matrix(void) {
     }
     ctrl[0]=0xc2; ctrl[1]=0xa0;
     check_title_bytes((const char *)ctrl,2,1);
+    /* Visually invisible or bidirectional format scalars must never reach
+     * the backend window-open callback, even in valid UTF-8. */
+    {
+        static const struct {
+            const char *bytes;
+            size_t length;
+        } forbidden[] = {
+            {"\xc2\xad",2},       /* U+00AD soft hyphen */
+            {"\xcd\x8f",2},       /* U+034F grapheme joiner */
+            {"\xd8\x9c",2},       /* U+061C Arabic letter mark */
+            {"\xe1\xa0\x8e",3},   /* U+180E invisible separator */
+            {"\xe2\x80\x8b",3},   /* U+200B zero-width space */
+            {"\xe2\x80\x8e",3},   /* U+200E left-to-right mark */
+            {"\xe2\x80\x8f",3},   /* U+200F right-to-left mark */
+            {"\xe2\x80\xa8",3},   /* U+2028 line separator */
+            {"\xe2\x80\xa9",3},   /* U+2029 paragraph separator */
+            {"\xe2\x80\xaa",3},   /* U+202A left-to-right embedding */
+            {"\xe2\x80\xae",3},   /* U+202E right-to-left override */
+            {"\xe2\x81\xa0",3},   /* U+2060 word joiner */
+            {"\xe2\x81\xa6",3},   /* U+2066 left-to-right isolate */
+            {"\xe2\x81\xa9",3},   /* U+2069 pop directional isolate */
+            {"\xe2\x81\xaf",3},   /* U+206F deprecated format */
+            {"\xef\xbb\xbf",3}    /* U+FEFF BOM */
+        };
+        for (n=0;n<sizeof forbidden/sizeof forbidden[0];n++) {
+            check_title_bytes(forbidden[n].bytes,forbidden[n].length,0);
+        }
+    }
+    /* Keep ordinary international scripts and emoji ZWJ sequences valid. */
+    check_title_bytes("\xd7\xa9",2,1); /* Hebrew letter */
+    check_title_bytes("\xe2\x9c\x93",3,1); /* Unicode check mark */
+    check_title_bytes("\xf0\x9f\x91\xa9\xe2\x80\x8d\xf0\x9f\x92\xbb",11,1);
+    memset(raw,'A',sizeof raw);
+    raw[124]=0xe2; raw[125]=0x80; raw[126]=0xae;
+    check_title_bytes((const char *)raw,sizeof raw,0);
     {
         const unsigned char max_scalar[]={0xf4,0x8f,0xbf,0xbf};
         const unsigned char beyond_max[]={0xf4,0x90,0x80,0x80};

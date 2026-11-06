@@ -51,5 +51,24 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
   set_tests_properties(desktop_callback_state_matrix PROPERTIES TIMEOUT 10)
   add_test(NAME desktop_sdl3_mock_lifecycle COMMAND test_desktop_sdl3_mock)
   set_tests_properties(desktop_sdl3_mock_lifecycle PROPERTIES TIMEOUT 10)
+
+  # Make the previously standalone Wave241–244 native lifecycle tests part
+  # of the actual CI CTest suite on GCC/Clang, Windows MSVC and macOS.
+  # A regression cannot be counted merely because its file was committed.
+  foreach(wave_test IN ITEMS
+      test_desktop_callback_table_snapshot_gpt6_wave241_20261106
+      test_gpt6_wave242_desktop_start_stop_20261106
+      test_gpt6_wave243_callback_cleanup_order_20261106
+      test_gpt6_wave244_invalid_poll_flags_20261106)
+    add_executable(${wave_test} tests/${wave_test}.c)
+    target_link_libraries(${wave_test} PRIVATE ores_desktop)
+    if(MSVC)
+      target_compile_options(${wave_test} PRIVATE /W4 /WX)
+    else()
+      target_compile_options(${wave_test} PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    endif()
+    add_test(NAME ${wave_test} COMMAND ${wave_test})
+    set_tests_properties(${wave_test} PROPERTIES TIMEOUT 10)
+  endforeach()
 endif()
 

@@ -126,11 +126,104 @@ static void bad_arguments(void) {
     CHECK(ores_desktop_run(&c,&a,&b)==ORES_DESKTOP_INVALID_ARGUMENT);
     c.title="A\0B"; c.title_length=3;
     CHECK(ores_desktop_run(&c,&a,&b)==ORES_DESKTOP_INVALID_ARGUMENT);
+    c.title="A\nB"; c.title_length=3;
+    CHECK(ores_desktop_run(&c,&a,&b)==ORES_DESKTOP_INVALID_ARGUMENT);
+    {
+        const char overlong[]={(char)0xc0,(char)0x80};
+        const char partial[]={(char)0xe2,(char)0x82};
+        const char surrogate[]={(char)0xed,(char)0xa0,(char)0x80};
+        const char too_high[]={(char)0xf4,(char)0x90,(char)0x80,(char)0x80};
+        const char stray[]={(char)0x80};
+        const char c1_control[]={(char)0xc2,(char)0x85};
+        const char *invalid[]={overlong,partial,surrogate,too_high,stray,c1_control};
+        const size_t sizes[]={2u,2u,3u,4u,1u,2u};
+        size_t i;
+        for (i=0;i<sizeof(sizes)/sizeof(sizes[0]);++i) {
+            c.title=invalid[i]; c.title_length=sizes[i];
+            CHECK(ores_desktop_run(&c,&a,&b)==ORES_DESKTOP_INVALID_ARGUMENT);
+        }
+    }
     CHECK(f.opens==0);
+    /* Valid non-ASCII UTF-8 must remain supported by the real host ABI. */
+    c.title="\xc3\xa9"; c.title_length=2; c.frame_limit=1;
+    f.live_config=&c;
+    CHECK(ores_desktop_run(&c,&a,&b)==ORES_DESKTOP_OK);
+    CHECK(f.opens==1 && f.closes==1);
 }
+
+/* Byte-length-exact title admission matrix. Each fixture uses a fresh host
+ * lifecycle and proves rejection occurs before any callback is invoked.
+ * In particular the 127-byte array is NOT NUL-terminated by the caller. */
+static void check_title_bytes(const char *bytes, size_t length, int accepted) {
+    fixture f={0};
+    ores_desktop_config c={ORES_DESKTOP_ABI_VERSION,800,600,1,1,bytes,length};
+    ores_desktop_app a={0};
+    ores_desktop_backend b={0};
+    f.live_config=&c;
+    a.context=&f; a.on_frame=frame_cb; a.on_stop=stopped;
+    b.context=&f; b.open=opened; b.poll=polled;
+    b.present=presented; b.close=closed;
+    CHECK(ores_desktop_run(&c,&a,&b)==
+          (accepted ? ORES_DESKTOP_OK : ORES_DESKTOP_INVALID_ARGUMENT));
+    CHECK(f.opens==accepted);
+    CHECK(f.closes==accepted);
+    CHECK(f.polls==accepted);
+    CHECK(f.frames==accepted);
+    CHECK(f.presents==accepted);
+    CHECK(f.stops==accepted);
+}
+static void title_boundary_matrix(void) {
+    unsigned char raw[127], ctrl[2];
+    unsigned n;
+    memset(raw,'A',sizeof raw);
+    check_title_bytes((const char *)raw,sizeof raw,1);
+    /* Positive exact-boundary sequences, ending on byte 127 without NUL. */
+    memset(raw,'A',sizeof raw);
+    raw[125]=0xc3; raw[126]=0xa9;
+    check_title_bytes((const char *)raw,sizeof raw,1);
+    memset(raw,'A',sizeof raw);
+    raw[124]=0xe2; raw[125]=0x82; raw[126]=0xac;
+    check_title_bytes((const char *)raw,sizeof raw,1);
+    memset(raw,'A',sizeof raw);
+    raw[123]=0xf0; raw[124]=0x9f; raw[125]=0x8c; raw[126]=0x8d;
+    check_title_bytes((const char *)raw,sizeof raw,1);
+    /* A truncated scalar at the final byte must not be completed from
+     * adjacent memory; the explicit length is the only admission boundary. */
+    memset(raw,'A',sizeof raw);
+    raw[126]=0xe2;
+    check_title_bytes((const char *)raw,sizeof raw,0);
+    memset(raw,'A',sizeof raw);
+    raw[125]=0xf0; raw[126]=0x9f;
+    check_title_bytes((const char *)raw,sizeof raw,0);
+    /* Reject every ASCII control and DEL, even at the beginning. */
+    for (n=0;n<0x20;n++) {
+        ctrl[0]=(unsigned char)n;
+        check_title_bytes((const char *)ctrl,1,0);
+    }
+    ctrl[0]=0x7f;
+    check_title_bytes((const char *)ctrl,1,0);
+    /* U+0080..U+009F are valid UTF-8 scalar encodings but forbidden UI
+     * C1 controls; U+00A0 immediately above the boundary remains valid. */
+    for (n=0x80;n<=0x9f;n++) {
+        ctrl[0]=0xc2; ctrl[1]=(unsigned char)n;
+        check_title_bytes((const char *)ctrl,2,0);
+    }
+    ctrl[0]=0xc2; ctrl[1]=0xa0;
+    check_title_bytes((const char *)ctrl,2,1);
+    {
+        const unsigned char max_scalar[]={0xf4,0x8f,0xbf,0xbf};
+        const unsigned char beyond_max[]={0xf4,0x90,0x80,0x80};
+        const unsigned char surrogate[]={0xed,0xbf,0xbf};
+        check_title_bytes((const char *)max_scalar,sizeof max_scalar,1);
+        check_title_bytes((const char *)beyond_max,sizeof beyond_max,0);
+        check_title_bytes((const char *)surrogate,sizeof surrogate,0);
+    }
+}
+
 int main(void) {
     CHECK(ores_desktop_abi_version()==ORES_DESKTOP_ABI_VERSION);
     bad_arguments();
+    title_boundary_matrix();
     run_scenario(0,ORES_DESKTOP_OK,3,0,3,1,1);
     run_scenario(1,ORES_DESKTOP_OK,0,1,0,1,1);
     run_scenario(2,ORES_DESKTOP_OK,3,6,3,1,1);

@@ -8,15 +8,21 @@ uint32_t ores_desktop_abi_version(void) { return ORES_DESKTOP_ABI_VERSION; }
  * engine or a complete Unicode Default_Ignorable_Code_Point table.
  * Preserve the existing U+00A0 compatibility behavior. */
 static int title_only_modifier(unsigned int scalar) {
-    return scalar==0x115fu || scalar==0x1160u ||
+    /* Union of the fail-closed #34 Unicode blank/format coverage and #35's
+     * broader modifier coverage. Neither is a Unicode rendering oracle. */
+    return (scalar>=0x2000u && scalar<=0x200au) ||
+           scalar==0x202fu || scalar==0x205fu || scalar==0x2800u ||
+           scalar==0x3000u ||
+           (scalar>=0x115fu && scalar<=0x1160u) ||
            (scalar>=0x17b4u && scalar<=0x17b5u) ||
            (scalar>=0x180bu && scalar<=0x180du) || scalar==0x180fu ||
-           scalar==0x200cu || scalar==0x200du ||
-           scalar==0x2800u || scalar==0x3164u || scalar==0xffa0u ||
+           (scalar>=0x200cu && scalar<=0x200du) ||
+           scalar==0x3164u || scalar==0xffa0u ||
            (scalar>=0xfe00u && scalar<=0xfe0fu) ||
            (scalar>=0xfff9u && scalar<=0xfffbu) ||
            (scalar>=0x1bca0u && scalar<=0x1bca3u) ||
-           (scalar>=0xe0000u && scalar<=0xe007fu) ||
+           (scalar>=0x1d173u && scalar<=0x1d17au) ||
+           (scalar>=0xe0000u && scalar<=0xe0fffu) ||
            (scalar>=0xe0100u && scalar<=0xe01efu);
 }
 /* SDL3 window titles must be complete UTF-8 scalar strings. */
@@ -67,13 +73,13 @@ static int valid_utf8_title(const char *s, size_t length) {
 static int snapshot_title(const char *source, size_t length, char destination[128]) {
     size_t i;
     if (!source || length == 0 || length > 127) return 0;
-    if (!valid_utf8_title(source,length)) return 0;
+    /* Copy first and validate the actual bytes supplied to backend.open.
+     * A caller must keep borrowed source bytes readable for this call. */
     for (i=0; i<length; ++i) {
-        if (source[i]=='\0') return 0; /* reject ambiguous/truncated UI titles */
         destination[i]=source[i];
     }
     destination[length]='\0';
-    return 1;
+    return valid_utf8_title(destination,length);
 }
 static int valid_status(ores_desktop_status s) {
     return s==ORES_DESKTOP_OK || s==ORES_DESKTOP_STOP;

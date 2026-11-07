@@ -284,6 +284,24 @@ static void title_invisible_only_matrix(void) {
     for (i=0;i<sizeof invisible/sizeof invisible[0];++i) {
         check_title_bytes(invisible[i].bytes,invisible[i].length,0);
     }
+    /* Reconcile #34's Unicode blank ranges with #35's modifier coverage.
+     * Reject standalone blank/format scalars before ANY callback. */
+    check_title_bytes("\xe2\x80\x80",3,0); /* U+2000 */
+    check_title_bytes("\xe2\x80\x83",3,0); /* U+2003 */
+    check_title_bytes("\xe2\x80\x8a",3,0); /* U+200A */
+    check_title_bytes("\xe2\x80\xaf",3,0); /* U+202F */
+    check_title_bytes("\xe2\x81\x9f",3,0); /* U+205F */
+    check_title_bytes("\xe3\x80\x80",3,0); /* U+3000 */
+    check_title_bytes("\xef\xbf\xb9",3,0); /* U+FFF9 */
+    check_title_bytes("\xf3\xa0\x82\x80",4,0); /* U+E0080 */
+    check_title_bytes("\xf0\x9d\x85\xb3",4,0); /* U+1D173 */
+    /* Existing ASCII-space/NBSP behavior and visible text remain stable. */
+    check_title_bytes(" ",1,1);
+    check_title_bytes("\xc2\xa0",2,1);
+    check_title_bytes("A\xe2\x80\x80",4,1);
+    check_title_bytes("A\xe2\x80\xaf",4,1);
+    check_title_bytes("A\xe3\x80\x80",4,1);
+    check_title_bytes("A\xef\xbf\xb9",4,1);
     check_title_bytes("\xe2\x80\x8c\xef\xb8\x8f\xe3\x85\xa4",9,0);
     check_title_bytes("\xe2\x80\x8d\xe2\x80\x8d",6,0);
     check_title_bytes("\xef\xb8\x8f\xef\xb8\x8f",6,0);

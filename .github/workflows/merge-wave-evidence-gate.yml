@@ -1,0 +1,31 @@
+# Synthetic regression job only; it is NOT a required release/merge check.
+name: source-free merge-wave evidence regression (synthetic)
+on:
+  pull_request:
+    paths:
+      - 'scripts/merge_wave_evidence_gate.mjs'
+      - 'tests/merge_wave_evidence_gate.test.mjs'
+      - '.github/workflows/merge-wave-evidence-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-evidence-regressions:
+    if: github.repository == 'ores-truffle-oreslang/oreslang-platform.desktop'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Assert exact checkout head
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_HEAD" =~ ^[a-f0-9]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Run synthetic fail-closed evidence model
+        run: node --test tests/merge_wave_evidence_gate.test.mjs

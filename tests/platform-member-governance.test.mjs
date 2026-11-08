@@ -36,6 +36,25 @@ function admit(bytes) {
   return {verified:false, parity:false, execution:false, evidence:"metadata-only"};
 }
 
+test("source-free workflow pins physical checkout before governance admission", () => {
+  const workflow = readFileSync(
+    new URL("../.github/workflows/platform-member-governance.yml", import.meta.url),
+    "utf8");
+  for (const required of [
+    "permissions:\n  contents: read",
+    "persist-credentials: false",
+    "ref: ${{ github.event.pull_request.head.sha || github.sha }}",
+    "git status --porcelain=v1 --untracked-files=all",
+    "git ls-files --others --ignored --exclude-standard",
+    "git hash-object --no-filters",
+    "HEAD:$file",
+    "node --test tests/platform-member-governance.test.mjs",
+  ]) {
+    assert.ok(workflow.includes(required), "missing fail-closed CI step: " + required);
+  }
+  assert.doesNotMatch(workflow, /pull_request_target|secrets\\./);
+});
+
 test("committed member manifest is a regular, single-linked canonical file", () => {
   assert.deepEqual(readManifestFromDisk(fileURLToPath(manifest)), {
     verified:false, parity:false, execution:false, evidence:"metadata-only"

@@ -1,7 +1,10 @@
 // Source-free per-member guard. Not a compiler, guest, CI or hardware attestation.
 import test from "node:test";
 import assert from "node:assert/strict";
-import {readFileSync, lstatSync} from "node:fs";
+import {readFileSync, lstatSync, fstatSync, openSync, closeSync, constants, mkdtempSync, mkdirSync, writeFileSync, symlinkSync, linkSync, rmSync} from "node:fs";
+import {dirname,join} from "node:path";
+import {tmpdir} from "node:os";
+import {fileURLToPath} from "node:url";
 
 const expected = {
   "schemaVersion": 1,
@@ -34,9 +37,7 @@ function admit(bytes) {
 }
 
 test("committed member manifest is a regular, single-linked canonical file", () => {
-  const stat = lstatSync(manifest);
-  assert.ok(stat.isFile() && !stat.isSymbolicLink() && stat.nlink === 1, "unsafe manifest file type or hard link");
-  assert.deepEqual(admit(readFileSync(manifest)), {
+  assert.deepEqual(readManifestFromDisk(fileURLToPath(manifest)), {
     verified:false, parity:false, execution:false, evidence:"metadata-only"
   });
 });
@@ -152,4 +153,99 @@ test("valid canonical manifest remains metadata-only, never evidence", () => {
   assert.deepEqual(result, {verified:false,parity:false,execution:false,evidence:"metadata-only"});
   assert.equal(Object.hasOwn(result,"approved"),false);
   assert.equal(Object.hasOwn(result,"certified"),false);
+});
+
+
+function readManifestFromDisk(path) {
+  const parent = lstatSync(dirname(path));
+  assert.ok(parent.isDirectory() && !parent.isSymbolicLink(), "unsafe manifest parent");
+  const entry = lstatSync(path);
+  assert.ok(entry.isFile() && !entry.isSymbolicLink() && entry.nlink === 1,
+            "unsafe manifest file type or hard link");
+  // O_NOFOLLOW applies at the final path; separately check the parent.
+  const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    const before = fstatSync(fd);
+    assert.ok(before.isFile() && before.nlink === 1 && before.size > 0 &&
+              before.size <= 65536, "invalid opened manifest");
+    const bytes = readFileSync(fd);
+    const after = fstatSync(fd);
+    assert.equal(bytes.length, before.size, "manifest size changed while reading");
+    assert.equal(after.dev, before.dev, "manifest device changed");
+    assert.equal(after.ino, before.ino, "manifest inode changed");
+    assert.equal(after.size, before.size, "manifest length changed");
+    assert.equal(after.mtimeMs, before.mtimeMs, "manifest modification time changed");
+    assert.equal(after.ctimeMs, before.ctimeMs, "manifest change time changed");
+    return admit(bytes);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+function fixture(callback) {
+  const root = mkdtempSync(join(tmpdir(), "desktop-member-governance-"));
+  try {
+    const trusted = join(root, "trusted");
+    mkdirSync(trusted);
+    const canonical = join(trusted, "integration.json");
+    writeFileSync(canonical, Buffer.from(JSON.stringify(expected,null,2)+"\n"));
+    callback({root,trusted,canonical});
+  } finally {
+    rmSync(root, {recursive:true, force:true});
+  }
+}
+
+test("disk admission rejects a symbolic-link parent despite valid target bytes", () => {
+  fixture(({root,trusted,canonical}) => {
+    assert.deepEqual(readManifestFromDisk(canonical),
+                     {verified:false,parity:false,execution:false,evidence:"metadata-only"});
+    const alias = join(root, "aliased-dir");
+    symlinkSync(trusted, alias, "dir");
+    assert.throws(() => readManifestFromDisk(join(alias,"integration.json")),
+                  /unsafe manifest parent/);
+  });
+});
+
+test("disk admission refuses a symlink leaf, including a correct canonical target", () => {
+  fixture(({root,canonical}) => {
+    const alias = join(root, "linked.json");
+    symlinkSync(canonical, alias);
+    assert.throws(() => readManifestFromDisk(alias),
+                  /unsafe manifest file/);
+  });
+});
+
+test("disk admission refuses a hardlinked manifest with identical trusted bytes", () => {
+  fixture(({root,canonical}) => {
+    const alias = join(root, "hardlink.json");
+    linkSync(canonical, alias);
+    assert.throws(() => readManifestFromDisk(alias),
+                  /unsafe manifest file/);
+    assert.throws(() => readManifestFromDisk(canonical),
+                  /unsafe manifest file/);
+  });
+});
+
+test("disk admission rejects directories, empty files, oversized files and altered bytes", () => {
+  fixture(({root,canonical}) => {
+    assert.throws(() => readManifestFromDisk(root), /unsafe manifest file/);
+    writeFileSync(canonical, Buffer.alloc(0));
+    assert.throws(() => readManifestFromDisk(canonical), /invalid opened manifest/);
+    writeFileSync(canonical, Buffer.alloc(65537, 0x20));
+    assert.throws(() => readManifestFromDisk(canonical), /invalid opened manifest/);
+    writeFileSync(canonical, Buffer.from(JSON.stringify({...expected, evidence:"verified"},null,2)+"\n"));
+    assert.throws(() => readManifestFromDisk(canonical));
+  });
+});
+
+test("disk-admitted canonical bytes never authorize an executed CI or guest claim", () => {
+  fixture(({canonical}) => {
+    const result = readManifestFromDisk(canonical);
+    assert.deepEqual(result, {
+      verified:false,parity:false,execution:false,evidence:"metadata-only"
+    });
+    for (const name of ["approved","ci_success","runner_id","guest","hardware"]) {
+      assert.ok(!Object.hasOwn(result,name), "spurious field " + name);
+    }
+  });
 });

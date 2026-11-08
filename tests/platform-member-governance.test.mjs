@@ -1,8 +1,8 @@
 // Source-free per-member guard. Not a compiler, guest, CI or hardware attestation.
 import test from "node:test";
 import assert from "node:assert/strict";
-import {readFileSync, lstatSync, fstatSync, openSync, closeSync, constants, mkdtempSync, mkdirSync, writeFileSync, symlinkSync, linkSync, rmSync} from "node:fs";
-import {dirname,join} from "node:path";
+import {readFileSync, lstatSync, fstatSync, openSync, closeSync, constants, mkdtempSync, mkdirSync, writeFileSync, symlinkSync, linkSync, renameSync, rmSync} from "node:fs";
+import {dirname,join,basename} from "node:path";
 import {tmpdir} from "node:os";
 import {fileURLToPath} from "node:url";
 
@@ -156,32 +156,63 @@ test("valid canonical manifest remains metadata-only, never evidence", () => {
 });
 
 
-function readManifestFromDisk(path) {
-  const parent = lstatSync(dirname(path));
-  assert.ok(parent.isDirectory() && !parent.isSymbolicLink(), "unsafe manifest parent");
-  const entry = lstatSync(path);
-  assert.ok(entry.isFile() && !entry.isSymbolicLink() && entry.nlink === 1,
-            "unsafe manifest file type or hard link");
-  // O_NOFOLLOW applies at the final path; separately check the parent.
-  const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+function readManifestFromDisk(path, afterParentPin = () => {}) {
+  // This source-free governance preflight uses a Linux directory descriptor:
+  // the final leaf is opened relative to the pinned parent inode, not through
+  // the mutable caller pathname. Without dirfd-relative traversal it fails
+  // closed instead of claiming symlink-race protection on another platform.
+  assert.ok(process.platform === "linux" && typeof constants.O_DIRECTORY === "number" &&
+            typeof constants.O_NOFOLLOW === "number",
+            "Linux directory-fd-relative no-follow admission required");
+  const parentPath = dirname(path);
+  const apparentParent = lstatSync(parentPath);
+  assert.ok(apparentParent.isDirectory() && !apparentParent.isSymbolicLink(),
+            "unsafe manifest parent");
+  const parentFd = openSync(parentPath,
+      constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
   try {
-    const before = fstatSync(fd);
-    assert.ok(before.isFile() && before.nlink === 1 && before.size > 0 &&
-              before.size <= 65536, "invalid opened manifest");
-    const bytes = readFileSync(fd);
-    const after = fstatSync(fd);
-    assert.equal(bytes.length, before.size, "manifest size changed while reading");
-    assert.equal(after.dev, before.dev, "manifest device changed");
-    assert.equal(after.ino, before.ino, "manifest inode changed");
-    assert.equal(after.size, before.size, "manifest length changed");
-    assert.equal(after.mtimeMs, before.mtimeMs, "manifest modification time changed");
-    assert.equal(after.ctimeMs, before.ctimeMs, "manifest change time changed");
-    return admit(bytes);
+    const beforeParent = fstatSync(parentFd);
+    const currentParent = lstatSync(parentPath);
+    assert.ok(beforeParent.isDirectory() && currentParent.isDirectory() &&
+              !currentParent.isSymbolicLink() &&
+              beforeParent.dev === currentParent.dev &&
+              beforeParent.ino === currentParent.ino &&
+              apparentParent.dev === beforeParent.dev &&
+              apparentParent.ino === beforeParent.ino,
+              "unsafe manifest parent identity");
+    // Test-only deterministic race injection point. The directory descriptor
+    // remains pinned even if the pathname is moved or swapped after this.
+    afterParentPin();
+    const leaf = join("/proc/self/fd", String(parentFd), basename(path));
+    const entry = lstatSync(leaf);
+    assert.ok(entry.isFile() && !entry.isSymbolicLink() && entry.nlink === 1,
+              "unsafe manifest file type or hard link");
+    const fd = openSync(leaf, constants.O_RDONLY | constants.O_NOFOLLOW);
+    try {
+      const before = fstatSync(fd);
+      assert.ok(before.isFile() && before.nlink === 1 && before.size > 0 &&
+                before.size <= 65536, "invalid opened manifest");
+      const bytes = readFileSync(fd);
+      const after = fstatSync(fd);
+      assert.equal(bytes.length, before.size, "manifest size changed while reading");
+      assert.equal(after.dev, before.dev, "manifest device changed");
+      assert.equal(after.ino, before.ino, "manifest inode changed");
+      assert.equal(after.size, before.size, "manifest length changed");
+      assert.equal(after.mtimeMs, before.mtimeMs, "manifest modification time changed");
+      assert.equal(after.ctimeMs, before.ctimeMs, "manifest change time changed");
+      const parentAfter = lstatSync(parentPath);
+      assert.ok(parentAfter.isDirectory() && !parentAfter.isSymbolicLink() &&
+                parentAfter.dev === beforeParent.dev &&
+                parentAfter.ino === beforeParent.ino,
+                "unsafe manifest parent changed during read");
+      return admit(bytes);
+    } finally {
+      closeSync(fd);
+    }
   } finally {
-    closeSync(fd);
+    closeSync(parentFd);
   }
 }
-
 function fixture(callback) {
   const root = mkdtempSync(join(tmpdir(), "desktop-member-governance-"));
   try {
@@ -194,6 +225,29 @@ function fixture(callback) {
     rmSync(root, {recursive:true, force:true});
   }
 }
+
+
+test("disk admission detects a parent symlink swap after directory pinning", () => {
+  fixture(({root,trusted,canonical}) => {
+    const outside = join(root, "attacker");
+    const moved = join(root, "moved-original");
+    mkdirSync(outside);
+    // Identical trusted bytes must not allow filesystem-identity substitution.
+    writeFileSync(join(outside,"integration.json"), readFileSync(canonical));
+    assert.throws(() => readManifestFromDisk(canonical, () => {
+      renameSync(trusted, moved);
+      symlinkSync(outside, trusted, "dir");
+    }), /unsafe manifest parent/);
+  });
+});
+
+test("stable pinned parent remains metadata-only even with injection hook", () => {
+  fixture(({canonical}) => {
+    assert.deepEqual(readManifestFromDisk(canonical, () => {}), {
+      verified:false, parity:false, execution:false, evidence:"metadata-only"
+    });
+  });
+});
 
 test("disk admission rejects a symbolic-link parent despite valid target bytes", () => {
   fixture(({root,trusted,canonical}) => {

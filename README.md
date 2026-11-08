@@ -23,3 +23,15 @@ This is a statement of intended project responsibilities. Consult source files a
 - [AttoLang](https://github.com/atto-lang)
 - [Target profiles](https://github.com/atto-lang/atto-target-profiles)
 - [Platform conformance](https://github.com/atto-lang/atto-platform-conformance)
+
+## Repository ownership and contribution routing
+
+**Belongs here:** Desktop app/window lifecycle, OS-specific event loops, native packaging/installers and desktop target compatibility.
+
+**Belongs elsewhere:** Portable UI widgets and rendering contracts belong in atto-runtime-ui; code generation in atto-source.*; shared target constraints in atto-target-profiles.
+
+**Security and portability boundary:** Restrict filesystem/network/process capabilities and UI-thread access; test real Windows/macOS/Linux targets and resource cleanup before claiming portability.
+
+AttoLang is the public name; preserve existing Oreslang/.ores compatibility and use canonical .atto for new portable library source. This README defines scope, not feature readiness.
+
+**Acceptance:** name exact source SHA/tree, runtime/toolchain, positive and negative checks and execution receipt before claiming support. Host-only tests and empty CI steps do not prove guest execution.

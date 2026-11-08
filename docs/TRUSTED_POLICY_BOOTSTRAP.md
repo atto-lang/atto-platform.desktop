@@ -10,8 +10,8 @@
   **no** `actions/checkout`, PR checkout, uploaded artifact, privileged secret,
   cross-organization carrier, source build, token write or status publication.
 - The workflow fetches only **same-repository policy blob**
-  `12848039041f1076b9321bb683c18a03818fbcc7`, then verifies SHA-256
-  `74e4fbf54c9d52864a29e38214c5239d0f1fc55b20ed78022939502f6c7235d9`
+  `94eb55af6fd1e1c505c5663568d3a2e0b51321c3`, then verifies SHA-256
+  `fdbad5892896312ca70bb754f87e46549579f3e8ef5f79bbcfe870d0ecedbb95`
   before executing it from runner temporary storage.
 - The policy compares authoritative PR ID/head/base with event metadata, checks
   branch protection, strict required checks, admin enforcement, and current-head
@@ -20,7 +20,7 @@
   two distinct current-head approvals including `ORESoftware`, with reviewer
   write access checked via GitHub's metadata API. Its required checks must
   include all five desktop jobs with the verified GitHub Actions App ID `15368`; force pushes,
-  branch deletion, stale review retention, or disabled CODEOWNER enforcement
+  branch deletion, spoofed/nonportable filenames, stale review retention, or disabled CODEOWNER enforcement
   cause an explicit denial. App-ID pinning alone does not prevent a PR
   from changing its own CI workflow; the protected workflow provenance and
   independent review gates are still necessary.

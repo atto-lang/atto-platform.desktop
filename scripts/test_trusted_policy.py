@@ -230,4 +230,19 @@ class PolicyTests(unittest.TestCase):
         with self.assertRaises(m.Denied):
             m.decision([], REPO, 'pull_request_target', self.get)
 
+
+    def test_unicode_format_bidi_and_noncharacter_controls_are_denied(self):
+        for path in ('src/ordinary\u202ebypass.txt', 'src/ordinary\u200ctitle.txt',
+                     'src/ordinary\ufefftitle.txt', 'src/ordinary\u0085title.txt',
+                     'src/ordinary\ud800title.txt'):
+            with self.subTest(path=repr(path)):
+                self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
+                    {'filename': path}]
+                self.deny()
+
+    def test_safe_nfc_international_path_still_admitted(self):
+        self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
+            {'filename': 'src/caf\u00e9.txt'}]
+        self.assertFalse(self.decision()['sensitive_paths'])
+
 if __name__=='__main__': unittest.main()

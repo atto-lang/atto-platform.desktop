@@ -48,7 +48,7 @@ def classify_changed_path(path):
     require(type(path) is str and 0 < len(path) <= 4096, 'invalid changed path type/size')
     require(not path.startswith('/') and '\\' not in path and
             all(piece not in ('', '.', '..') for piece in path.split('/')) and
-            all(32 <= ord(ch) < 127 or ord(ch) >= 128 for ch in path) and
+            all(unicodedata.category(ch) not in ('Cc', 'Cf', 'Cs') for ch in path) and
             unicodedata.normalize('NFC', path) == path,
             'nonportable or ambiguous changed path')
     folded = path.casefold()

@@ -12,7 +12,7 @@ function fixture(target="oreslang-platform.desktop#14") {
   const pr={repository,number,headSha:HEAD,baseSha:BASE,author,state:"open",draft:false};
   const branch={sha:BASE,protected:true,strictRequiredChecks:true,
     codeOwnerReviewRequired:true,dismissStaleReviews:true,enforceAdmins:true,
-    forcePushAllowed:false,deleteAllowed:false};
+    forcePushAllowed:false,deleteAllowed:false,requiredApprovingReviewCount:1};
   const reviews=[{id:1,login:"ORESoftware",state:"APPROVED",commitSha:HEAD,permission:"admin"}];
   if (target==="oreslang-platform.desktop#14")
     reviews.push({id:2,login:"security-second",state:"APPROVED",commitSha:HEAD,permission:"write"});
@@ -103,4 +103,82 @@ test("invalid pinned target rejected without throwing",()=>{
 test("missing snapshot rejected without granting merge/release",()=>{
   const x=fixture();x.snapshot=null;
   denied(x,"MALFORMED_EVIDENCE");
+});
+
+
+change("independent outstanding changes request blocks even with two other approvals",
+  s=>{s.reviews.push({id:9,login:"security-third",state:"CHANGES_REQUESTED",commitSha:HEAD,permission:"write"});},
+  "MISSING_CURRENT_INDEPENDENT_APPROVAL");
+test("resolved third-party changes request permits diagnostic only",()=>{
+  const e=fixture();
+  e.snapshot.reviews.push({id:9,login:"security-third",state:"CHANGES_REQUESTED",commitSha:HEAD,permission:"write"});
+  e.snapshot.reviews.push({id:10,login:"security-third",state:"COMMENTED",commitSha:HEAD,permission:"write"});
+  const outcome=audit(e);
+  assert.equal(outcome.readyForIndependentReview,true);
+  assert.equal(outcome.mergeAuthorized,false);
+  assert.equal(outcome.releaseAuthorized,false);
+});
+change("ordinary PR requires branch-configured second approval",
+  (s,p)=>{
+    p.repository=sourceRepo+"oreslang-platform.desktop";p.number=35;
+    s.startPr.repository=p.repository;s.endPr.repository=p.repository;
+    s.startPr.number=35;s.endPr.number=35;
+    s.startBranch.requiredApprovingReviewCount=2;s.endBranch.requiredApprovingReviewCount=2;
+    s.reviews=[s.reviews[0]];
+    const required=MERGE_TARGETS["oreslang-platform.desktop#35"];
+    s.checkRuns=s.checkRuns.filter(x=>required.includes(x.name));
+    const ids=new Set(s.checkRuns.map(x=>x.id));
+    s.jobs=s.jobs.filter(x=>ids.has(x.checkRunId));
+    const runs=new Set(s.jobs.map(x=>x.runId));
+    s.workflowRuns=s.workflowRuns.filter(x=>runs.has(x.id));
+  },
+  "MISSING_CURRENT_INDEPENDENT_APPROVAL");
+test("ordinary PR with two branch-required independent approvals is diagnostic-only",()=>{
+  const e=fixture("oreslang-platform.desktop#35");
+  e.snapshot.startBranch.requiredApprovingReviewCount=2;
+  e.snapshot.endBranch.requiredApprovingReviewCount=2;
+  e.snapshot.reviews.push({id:3,login:"security-second",state:"APPROVED",commitSha:HEAD,permission:"write"});
+  const actual=audit(e);
+  assert.equal(actual.readyForIndependentReview,true,actual.reasons.join(","));
+  assert.equal(actual.mergeAuthorized,false);
+});
+change("sensitive PR branch-required third approval cannot be replaced by only two",
+  s=>{s.startBranch.requiredApprovingReviewCount=3;s.endBranch.requiredApprovingReviewCount=3;},
+  "MISSING_CURRENT_INDEPENDENT_APPROVAL");
+test("sensitive PR with three required approvals remains diagnostic only",()=>{
+  const e=fixture();
+  e.snapshot.startBranch.requiredApprovingReviewCount=3;
+  e.snapshot.endBranch.requiredApprovingReviewCount=3;
+  e.snapshot.reviews.push({id:3,login:"security-third",state:"APPROVED",commitSha:HEAD,permission:"maintain"});
+  const x=audit(e);
+  assert.equal(x.readyForIndependentReview,true,x.reasons.join(","));
+  assert.equal(x.mergeAuthorized,false);
+});
+change("branch approval count modified during audit denied",
+  s=>{s.endBranch.requiredApprovingReviewCount=3;},
+  "UNPROTECTED_OR_MOVING_BASE");
+change("branch approval quorum cannot be false",
+  s=>{s.startBranch.requiredApprovingReviewCount=false;},
+  "UNPROTECTED_OR_MOVING_BASE");
+change("branch approval quorum cannot be zero",
+  s=>{s.startBranch.requiredApprovingReviewCount=0;},
+  "UNPROTECTED_OR_MOVING_BASE");
+for(const unsafe of ["CONIN$","CONOUT$","COM¹.txt","LPT².txt","lpt³","CON.txt","AUX.log"]) {
+  change("reject Windows reserved checkout path "+unsafe,
+    s=>{s.checkout.tracked[0].path="src/"+unsafe;s.checkout.physical[0].path="src/"+unsafe;},
+    "UNVERIFIED_PHYSICAL_CHECKOUT");
+}
+change("ambiguous Unicode case-folded checkout path cannot attest",
+  s=>{s.checkout.tracked[0].path="src/straße.txt";s.checkout.physical[0].path="src/STRASSE.txt";},
+  "UNVERIFIED_PHYSICAL_CHECKOUT");
+change("even matching Unicode paths require an independent casefold attestation",
+  s=>{s.checkout.tracked[0].path="src/café.txt";s.checkout.physical[0].path="src/café.txt";},
+  "UNVERIFIED_PHYSICAL_CHECKOUT");
+test("safe Windows non-device COM10 checkout remains diagnostic-only",()=>{
+  const e=fixture();
+  e.snapshot.checkout.tracked[0].path="src/COM10.txt";
+  e.snapshot.checkout.physical[0].path="src/COM10.txt";
+  const x=audit(e);
+  assert.equal(x.readyForIndependentReview,true,x.reasons.join(","));
+  assert.equal(x.mergeAuthorized,false);
 });

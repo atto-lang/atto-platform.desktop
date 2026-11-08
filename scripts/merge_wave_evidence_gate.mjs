@@ -19,11 +19,15 @@ const positiveInt = v => Number.isSafeInteger(v) && v > 0;
 const has = (v, key) => Object.prototype.hasOwnProperty.call(v, key);
 const forbidden = /[<>:"\\|?*\x00-\x1f\x7f]/;
 function safePath(name) {
+  // JavaScript lowercasing is not full Unicode case folding. Refuse to make
+  // positive physical-checkout claims for non-ASCII names without an external,
+  // authoritative portable-path attestation.
   if (typeof name !== "string" || !name || name.length > 4096 ||
-      name.startsWith("/") || forbidden.test(name) || name.normalize("NFC") !== name) return false;
+      name.startsWith("/") || /[^\x20-\x7e]/.test(name) ||
+      forbidden.test(name) || name.normalize("NFC") !== name) return false;
   return name.split("/").every(s => s && s !== "." && s !== ".." &&
     s.toLowerCase() !== ".git" && !/[. ]$/.test(s) &&
-    !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(s));
+    !/^(conin\$|conout\$|con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\.|$)/i.test(s));
 }
 function checkoutEvidence(c) {
   if (!object(c) || !Array.isArray(c.tracked) || !Array.isArray(c.physical) ||
@@ -62,10 +66,11 @@ function branchMatch(b, pinned) {
     b.protected === true && b.strictRequiredChecks === true &&
     b.codeOwnerReviewRequired === true && b.dismissStaleReviews === true &&
     b.enforceAdmins === true && b.forcePushAllowed === false &&
-    b.deleteAllowed === false;
+    b.deleteAllowed === false && positiveInt(b.requiredApprovingReviewCount) &&
+    b.requiredApprovingReviewCount <= 100;
 }
-function reviewEvidence(reviews, pinned, author, securitySensitive) {
-  if (!Array.isArray(reviews)) return false;
+function reviewEvidence(reviews, pinned, author, securitySensitive, configuredQuorum) {
+  if (!Array.isArray(reviews) || !positiveInt(configuredQuorum) || configuredQuorum > 100) return false;
   const latest = new Map();
   for (const r of reviews) {
     if (!object(r) || typeof r.login !== "string" ||
@@ -76,13 +81,18 @@ function reviewEvidence(reviews, pinned, author, securitySensitive) {
     if (previous && previous.id >= r.id) return false; // monotonic immutable event order
     latest.set(key, r);
   }
+  // An unresolved independent CHANGES_REQUESTED must not be ignored just
+  // because two *other* people have already approved.
+  if ([...latest.values()].some(r => r.state === "CHANGES_REQUESTED" &&
+      r.login.toLowerCase() !== author.toLowerCase())) return false;
   const approved = [...latest.values()].filter(r =>
     r.state === "APPROVED" && r.commitSha === pinned.headSha &&
     r.login.toLowerCase() !== author.toLowerCase() &&
     ["write","maintain","admin"].includes(r.permission));
   const owners = new Set(["oresoftware","the1mills"]);
   if (!approved.some(r => owners.has(r.login.toLowerCase()))) return false;
-  return new Set(approved.map(r => r.login.toLowerCase())).size >= (securitySensitive ? 2 : 1);
+  return new Set(approved.map(r => r.login.toLowerCase())).size >=
+    Math.max(configuredQuorum, securitySensitive ? 2 : 1);
 }
 function ciEvidence(s, pinned, required) {
   if (!Array.isArray(s.checkRuns) || !Array.isArray(s.workflowRuns) || !Array.isArray(s.jobs)) return false;
@@ -143,9 +153,12 @@ export function assessMergeWaveEvidence(snapshot, pinned) {
   const author = object(snapshot.startPr) ? snapshot.startPr.author : "";
   if (!snapshotMatch(snapshot.startPr, pinned, author) ||
       !snapshotMatch(snapshot.endPr, pinned, author)) deny("STALE_OR_MOVING_PR");
-  if (!branchMatch(snapshot.startBranch, pinned) || !branchMatch(snapshot.endBranch, pinned))
+  if (!branchMatch(snapshot.startBranch, pinned) || !branchMatch(snapshot.endBranch, pinned) ||
+      snapshot.startBranch.requiredApprovingReviewCount !==
+      snapshot.endBranch.requiredApprovingReviewCount)
     deny("UNPROTECTED_OR_MOVING_BASE");
-  if (!reviewEvidence(snapshot.reviews, pinned, author, key === "oreslang-platform.desktop#14"))
+  if (!reviewEvidence(snapshot.reviews, pinned, author, key === "oreslang-platform.desktop#14",
+      object(snapshot.startBranch) ? snapshot.startBranch.requiredApprovingReviewCount : null))
     deny("MISSING_CURRENT_INDEPENDENT_APPROVAL");
   if (!ciEvidence(snapshot, pinned, required)) deny("UNEXECUTED_OR_UNTRUSTED_CI");
   if (!checkoutEvidence(snapshot.checkout)) deny("UNVERIFIED_PHYSICAL_CHECKOUT");

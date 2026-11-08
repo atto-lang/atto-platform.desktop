@@ -77,10 +77,159 @@ static const token modifiers[]={
     {"\xf3\xa0\x84\x80",4},    /* U+E0100 supplemental VS */
     {"\xf3\xa0\x81\xa1",4},    /* U+E0061 Unicode tag */
     {"\xe1\x9e\xb4",3},        /* U+17B4 Khmer invisible */
-    {"\xe1\xa0\x8b",3}         /* U+180B Mongolian VS */
+    {"\xe1\xa0\x8b",3},        /* U+180B Mongolian VS */
+    {"\xe2\x80\x80",3},        /* U+2000 en quad */
+    {"\xe2\x80\x83",3},        /* U+2003 em space */
+    {"\xe2\x80\x8a",3},        /* U+200A hair space */
+    {"\xe2\x80\xaf",3},        /* U+202F narrow no-break space */
+    {"\xe2\x81\x9f",3},        /* U+205F medium mathematical space */
+    {"\xe3\x80\x80",3},        /* U+3000 ideographic space */
+    {"\xe1\x9e\xb5",3},        /* U+17B5 Khmer invisible vowel */
+    {"\xe1\xa0\x8f",3},        /* U+180F Mongolian free VS */
+    {"\xef\xbe\xa0",3},        /* U+FFA0 halfwidth Hangul filler */
+    {"\xef\xb8\x80",3},        /* U+FE00 VS1 */
+    {"\xef\xbf\xb9",3},        /* U+FFF9 interlinear annotation anchor */
+    {"\xef\xbf\xbb",3},        /* U+FFFB interlinear annotation terminator */
+    {"\xf0\x9b\xb2\xa0",4},    /* U+1BCA0 shorthand format */
+    {"\xf0\x9b\xb2\xa3",4},    /* U+1BCA3 shorthand format */
+    {"\xf0\x9d\x85\xb3",4},    /* U+1D173 musical control */
+    {"\xf3\xa0\x82\x80",4},    /* U+E0080 tag-plane format */
+    {"\xf3\xa0\xbf\xbf",4},    /* U+E0FFF tag-plane format */
+    {"\xf3\xa0\x87\xaf",4}     /* U+E01EF supplemental VS */
 };
+
+/* Test every policy token independently, not only random mixtures: changes
+ * near Unicode range boundaries must fail visibly and before callbacks. */
+static void verify_every_modifier(void) {
+    unsigned char bytes[128];
+    size_t i;
+    for (i=0; i<sizeof(modifiers)/sizeof(modifiers[0]); ++i) {
+        const token *t=&modifiers[i];
+        CHECK(t->length>=1u && t->length<=4u);
+        memcpy(bytes,t->bytes,t->length);
+        verify(bytes,t->length,0);
+        memmove(bytes+1,bytes,t->length);
+        bytes[0]='A';
+        verify(bytes,t->length+1u,1);
+        memcpy(bytes+t->length+1u,"\xe2\x80\xae",3); /* U+202E RLO */
+        verify(bytes,t->length+4u,0);
+    }
+}
+/* Forbidden formatting controls must reject even when a real anchor exists.
+ * Cover both ends and every scalar in U+2028..202E / U+2060..206F. */
+static void verify_forbidden_controls(void) {
+    static const token forbidden[]={
+        {"\xc2\xad",2},       /* U+00AD soft hyphen */
+        {"\xcd\x8f",2},       /* U+034F combining grapheme joiner */
+        {"\xd8\x9c",2},       /* U+061C Arabic letter mark */
+        {"\xe1\xa0\x8e",3},   /* U+180E Mongolian vowel separator */
+        {"\xe2\x80\x8b",3},   /* U+200B zero width space */
+        {"\xe2\x80\x8e",3},   /* U+200E left-to-right mark */
+        {"\xe2\x80\x8f",3},   /* U+200F right-to-left mark */
+        {"\xef\xbb\xbf",3}    /* U+FEFF BOM */
+    };
+    unsigned char bytes[8];
+    size_t i;
+    unsigned n;
+    for (i=0; i<sizeof(forbidden)/sizeof(forbidden[0]); ++i) {
+        memcpy(bytes,forbidden[i].bytes,forbidden[i].length);
+        verify(bytes,forbidden[i].length,0);
+        bytes[forbidden[i].length]='A';
+        verify(bytes,forbidden[i].length+1u,0);
+        memmove(bytes+1,bytes,forbidden[i].length);
+        bytes[0]='A';
+        verify(bytes,forbidden[i].length+1u,0);
+    }
+    for (n=0; n<7u; ++n) {
+        bytes[0]=0xe2; bytes[1]=0x80; bytes[2]=(unsigned char)(0xa8u+n);
+        verify(bytes,3u,0);
+        bytes[3]='A';
+        verify(bytes,4u,0);
+    }
+    for (n=0; n<16u; ++n) {
+        bytes[0]=0xe2; bytes[1]=0x81; bytes[2]=(unsigned char)(0xa0u+n);
+        verify(bytes,3u,0);
+        bytes[3]='A';
+        verify(bytes,4u,0);
+    }
+    /* UTF-8 encoded C1 controls remain forbidden, with or without anchors. */
+    for (n=0x80u; n<=0x9fu; ++n) {
+        bytes[0]=0xc2; bytes[1]=(unsigned char)n;
+        verify(bytes,2u,0);
+        bytes[2]='A';
+        verify(bytes,3u,0);
+    }
+}
+/* Canonical malformed UTF-8 classes: overlong, surrogate, > U+10FFFF,
+ * invalid lead/continuation, truncation and embedded NUL, even with text. */
+static void verify_invalid_utf8(void) {
+    static const token invalid[]={
+        {"\x80",1}, {"\xbf",1}, {"\xff",1}, {"\xfe",1},
+        {"\xc0\xaf",2}, {"\xc1\xbf",2}, {"\xe0\x80\x80",3},
+        {"\xf0\x80\x80\x80",4}, {"\xed\xa0\x80",3},
+        {"\xed\xbf\xbf",3}, {"\xf4\x90\x80\x80",4},
+        {"\xf5\x80\x80\x80",4}, {"\xe2\x28\xa1",3},
+        {"\xe2\x82",2}, {"\xf0\x9f\x92",3},
+        {"\xc2\x41",2}, {"\xe2\x82\x41",3},
+        {"\xf8\x88\x80\x80\x80",5},
+        {"A\x00" "B",3}
+    };
+    unsigned char bytes[128];
+    size_t i;
+    for (i=0; i<sizeof(invalid)/sizeof(invalid[0]); ++i) {
+        const token *t=&invalid[i];
+        CHECK(t->length<=5u);
+        memcpy(bytes,t->bytes,t->length);
+        verify(bytes,t->length,0);
+        memmove(bytes+1,bytes,t->length);
+        bytes[0]='A';
+        verify(bytes,t->length+1u,0);
+        memcpy(bytes,t->bytes,t->length);
+        bytes[t->length]='A';
+        verify(bytes,t->length+1u,0);
+    }
+}
+static void verify_ascii_and_length_boundaries(void) {
+    unsigned char bytes[128];
+    unsigned n;
+    /* Reject ASCII C0 and DEL with visible anchors, before ANY callback. */
+    for (n=0; n<32u; ++n) {
+        bytes[0]=(unsigned char)n;
+        verify(bytes,1u,0);
+        bytes[1]='A';
+        verify(bytes,2u,0);
+    }
+    bytes[0]=0x7f;
+    verify(bytes,1u,0);
+    bytes[1]='A';
+    verify(bytes,2u,0);
+    /* Preserve the pre-existing ASCII space and NBSP compatibility rules. */
+    bytes[0]=' ';
+    verify(bytes,1u,1);
+    bytes[0]=0xc2; bytes[1]=0xa0;
+    verify(bytes,2u,1);
+    /* Exact upper boundary, including an invisible suffix. */
+    memset(bytes,'A',sizeof bytes);
+    verify(bytes,126u,1);
+    verify(bytes,127u,1);
+    verify(bytes,128u,0);
+    memset(bytes,'A',125u);
+    bytes[125]=0xc2; bytes[126]=0xa0; /* anchored NBSP at 127 bytes */
+    verify(bytes,127u,1);
+    memset(bytes,'A',124u);
+    memcpy(bytes+124u,"\xe2\x80\x8c",3); /* anchored ZWNJ */
+    verify(bytes,127u,1);
+    bytes[0]=' ';
+    memcpy(bytes+1u,"\xe2\x80\x8c",3); /* space is an anchor */
+    verify(bytes,4u,1);
+}
+
 int main(void) {
     unsigned char bytes[128];
+    verify_every_modifier();
+    verify_forbidden_controls();
+    verify_invalid_utf8();
+    verify_ascii_and_length_boundaries();
     unsigned iteration;
     for (iteration=0; iteration<4096; ++iteration) {
         size_t length=0;

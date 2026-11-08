@@ -142,4 +142,92 @@ class PolicyTests(unittest.TestCase):
         with self.assertRaises(m.Denied):
             m.decision(self.event, REPO, 'pull_request', self.get)
 
+
+    def test_mixed_case_workflow_requires_second_review(self):
+        self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
+            {'filename': '.GITHUB/WORKFLOWS/ci.yml'}]
+        self.deny()
+        self.db[f'repos/{REPO}/pulls/16/reviews?per_page=100&page=1'].append(
+            {'user': {'login': 'security-second'}, 'state': 'APPROVED', 'commit_id': HEAD})
+        self.assertTrue(self.decision()['sensitive_paths'])
+
+    def test_case_variant_sensitive_script_path_requires_second_review(self):
+        self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
+            {'filename': 'SCRIPTS/TRUSTED_POLICY.PY'}]
+        self.deny()
+
+    def test_renamed_mixed_case_sensitive_path_requires_second_review(self):
+        self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
+            {'filename': 'ordinary.txt', 'previous_filename': '.GITHUB/WORKFLOWS/ci.yml'}]
+        self.deny()
+
+    def test_duplicate_changed_files_are_rejected(self):
+        self.pr['changed_files'] = 2
+        self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
+            {'filename': 'src/main.c'}, {'filename': 'src/main.c'}]
+        self.deny()
+
+    def test_case_colliding_changed_files_are_rejected(self):
+        self.pr['changed_files'] = 2
+        self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
+            {'filename': 'src/main.c'}, {'filename': 'SRC/MAIN.C'}]
+        self.deny()
+
+    def test_nonportable_changed_file_paths_are_rejected(self):
+        for raw in ('../.github/workflows/ci.yml', '/.github/workflows/ci.yml',
+                    'src\\trusted_policy.py', 'src//main.c', 'src/./main.c',
+                    'cafe\u0301.txt', '', 'src/\tfile.c'):
+            with self.subTest(raw=repr(raw)):
+                self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
+                    {'filename': raw}]
+                self.deny()
+
+    def test_malformed_previous_filename_is_rejected(self):
+        for value in (None, 4, [], {'filename': '.github/workflows/x.yml'}):
+            with self.subTest(previous=repr(value)):
+                self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
+                    {'filename': 'ordinary.txt', 'previous_filename': value}]
+                self.deny()
+
+    def test_boolean_required_review_count_is_not_an_integer_quorum(self):
+        self.db[f'repos/{REPO}/branches/main/protection'][
+            'required_pull_request_reviews']['required_approving_review_count'] = True
+        self.deny()
+
+    def test_moving_pr_head_during_api_audit_is_rejected(self):
+        count = 0
+        def moving_get(path):
+            nonlocal count
+            if path == f'repos/{REPO}/pulls/16':
+                count += 1
+                if count > 1:
+                    changed = copy.deepcopy(self.db[path])
+                    changed['head']['sha'] = 'c' * 40
+                    return changed
+            return self.get(path)
+        with self.assertRaises(m.Denied):
+            m.decision(self.event, REPO, 'pull_request_target', moving_get)
+
+    def test_moving_main_head_during_api_audit_is_rejected(self):
+        count = 0
+        def moving_get(path):
+            nonlocal count
+            if path == f'repos/{REPO}/branches/main':
+                count += 1
+                if count > 1:
+                    changed = copy.deepcopy(self.db[path])
+                    changed['commit']['sha'] = 'c' * 40
+                    return changed
+            return self.get(path)
+        with self.assertRaises(m.Denied):
+            m.decision(self.event, REPO, 'pull_request_target', moving_get)
+
+    def test_missing_author_login_is_rejected(self):
+        self.pr['user']['login'] = None
+        self.deny()
+
+    def test_non_object_event_is_rejected(self):
+        with self.assertRaises(m.Denied):
+            m.decision([], REPO, 'pull_request_target', self.get)
+
 if __name__=='__main__': unittest.main()

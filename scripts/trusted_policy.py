@@ -9,6 +9,7 @@ import json
 import os
 import re
 import subprocess
+import unicodedata
 import sys
 from pathlib import Path
 
@@ -41,7 +42,20 @@ def page_all(get, base, maximum=1000):
     raise Denied('pagination incomplete')
 
 
+
+def classify_changed_path(path):
+    """Fail closed on nonportable PR file names and classify case-folded sensitive paths."""
+    require(type(path) is str and 0 < len(path) <= 4096, 'invalid changed path type/size')
+    require(not path.startswith('/') and '\\' not in path and
+            all(piece not in ('', '.', '..') for piece in path.split('/')) and
+            all(32 <= ord(ch) < 127 or ord(ch) >= 128 for ch in path) and
+            unicodedata.normalize('NFC', path) == path,
+            'nonportable or ambiguous changed path')
+    folded = path.casefold()
+    return folded, any(folded.startswith(prefix.casefold()) for prefix in SENSITIVE)
+
 def decision(event, repo, event_name, get):
+    require(type(event) is dict, 'invalid GitHub event')
     require(repo == REPO, 'unexpected source repository')
     require(event_name in ('pull_request_target', 'pull_request_review'), 'unsupported event')
     event_pr = event.get('pull_request') or {}
@@ -80,23 +94,36 @@ def decision(event, repo, event_name, get):
             'force pushes permitted or unverifiable')
     require((protection.get('allow_deletions') or {}).get('enabled') is False,
             'branch deletion permitted or unverifiable')
-    require((reviews_rule.get('required_approving_review_count') or 0) >= 1,
+    needed = reviews_rule.get('required_approving_review_count')
+    require(type(needed) is int and 1 <= needed <= 100,
             'independent reviews not enforced')
     require((protection.get('enforce_admins') or {}).get('enabled') is True,
             'admin enforcement missing')
     files = page_all(get, f'repos/{REPO}/pulls/{number}/files', maximum=5000)
-    require(len(files) == pr.get('changed_files') and bool(files), 'incomplete PR files')
-    sensitive = any(any(isinstance(f.get(key), str) and
-                        any(f[key].startswith(prefix) for prefix in SENSITIVE)
-                        for key in ('filename', 'previous_filename')) for f in files)
-    require(all(isinstance(f.get('filename'), str) for f in files), 'malformed changed path')
+    require(type(pr.get('changed_files')) is int and pr['changed_files'] > 0 and
+            len(files) == pr['changed_files'], 'incomplete PR files')
+    sensitive = False
+    seen = set()
+    for record in files:
+        require(type(record) is dict, 'malformed changed-file record')
+        normalized, flag = classify_changed_path(record.get('filename'))
+        require(normalized not in seen, 'duplicate or case-colliding changed path')
+        seen.add(normalized)
+        sensitive = sensitive or flag
+        if 'previous_filename' in record:
+            _, old_flag = classify_changed_path(record['previous_filename'])
+            sensitive = sensitive or old_flag
     reviews = page_all(get, f'repos/{REPO}/pulls/{number}/reviews', maximum=1000)
     latest = {}
     for item in reviews:
         user = (item.get('user') or {}).get('login')
         if isinstance(user, str):
             latest[user.casefold()] = item
-    author = (pr.get('user') or {}).get('login', '').casefold()
+    author_name = (pr.get('user') or {}).get('login')
+    require(type(author_name) is str and
+            re.fullmatch(r'[A-Za-z0-9-]{1,39}', author_name) is not None,
+            'invalid PR author identity')
+    author = author_name.casefold()
     qualified = [r for login, r in latest.items()
                  if login != author and r.get('state') == 'APPROVED'
                  and r.get('commit_id') == head_sha]
@@ -111,6 +138,22 @@ def decision(event, repo, event_name, get):
         permission = get(f'repos/{REPO}/collaborators/{login}/permission')
         require(permission.get('permission') in ('write', 'maintain', 'admin'),
                 'reviewer lacks verified write-level repository access')
+
+    # Prevent a PR/head/base change partway through this multi-request audit
+    # from being mistaken for an assessment of a single immutable snapshot.
+    refreshed = get(f'repos/{REPO}/pulls/{number}')
+    require(type(refreshed) is dict and
+            refreshed.get('number') == number and
+            refreshed.get('state') == 'open' and refreshed.get('draft') is False and
+            (refreshed.get('head') or {}).get('sha') == head_sha and
+            (refreshed.get('base') or {}).get('sha') == base_sha and
+            refreshed.get('changed_files') == pr['changed_files'] and
+            (refreshed.get('user') or {}).get('login', '').casefold() == author,
+            'PR identity changed during metadata audit')
+    last_branch = get(f'repos/{REPO}/branches/main')
+    require(last_branch.get('protected') is True and
+            (last_branch.get('commit') or {}).get('sha') == base_sha,
+            'main protection or base changed during metadata audit')
     return {'kind': 'METADATA_ONLY_NOT_RELEASE_APPROVAL', 'head_sha': head_sha,
             'base_sha': base_sha, 'sensitive_paths': sensitive,
             'qualified_review_count': len(qualified)}

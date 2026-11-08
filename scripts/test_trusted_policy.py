@@ -362,8 +362,7 @@ class PolicyTests(unittest.TestCase):
     def test_windows_reserved_device_filenames_are_denied(self):
         for basename in ('CON', 'con.txt', 'PRN', 'AUX.log', 'NUL',
                          'COM1.txt', 'LPT9', 'COM\u00b9.txt', 'LPT\u00b2.dat',
-                         'CONIN
-, 'CONOUT
+                         'CONIN$', 'CONOUT$'
 ):
             with self.subTest(name=basename):
                 self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
@@ -390,4 +389,59 @@ class PolicyTests(unittest.TestCase):
         self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
             {'filename': 'src/safe.c', 'previous_filename': 'src/CON.txt'}]
         self.deny()
+
+    def test_detailed_branch_protection_is_read_twice(self):
+        path = f'repos/{REPO}/branches/main/protection'
+        calls = []
+        original = self.get
+        def recording_get(current):
+            if current == path:
+                calls.append(current)
+            return original(current)
+        self.assertEqual(
+            m.decision(self.event, REPO, 'pull_request_target', recording_get)['kind'],
+            'METADATA_ONLY_NOT_RELEASE_APPROVAL')
+        self.assertEqual(len(calls), 2)
+
+    def test_detailed_branch_protection_changes_during_audit_denied(self):
+        path = f'repos/{REPO}/branches/main/protection'
+        def weaken_strict(p):
+            p['required_status_checks']['strict'] = False
+        def drop_check(p):
+            p['required_status_checks']['checks'].pop()
+        def drop_stale_review(p):
+            p['required_pull_request_reviews']['dismiss_stale_reviews'] = False
+        def drop_codeowners(p):
+            p['required_pull_request_reviews']['require_code_owner_reviews'] = False
+        def drop_quorum(p):
+            p['required_pull_request_reviews']['required_approving_review_count'] = 0
+        def disable_admin(p):
+            p['enforce_admins']['enabled'] = False
+        def allow_force(p):
+            p['allow_force_pushes']['enabled'] = True
+        def allow_delete(p):
+            p['allow_deletions']['enabled'] = True
+        for name, mutate in [
+            ('required checks strictness', weaken_strict),
+            ('required check removed', drop_check),
+            ('stale approval dismissal', drop_stale_review),
+            ('CODEOWNER requirement', drop_codeowners),
+            ('approval quorum', drop_quorum),
+            ('admin enforcement', disable_admin),
+            ('force push', allow_force),
+            ('branch deletion', allow_delete),
+        ]:
+            with self.subTest(protection_mutation=name):
+                calls = [0]
+                def changing_get(current):
+                    value = self.get(current)
+                    if current == path:
+                        calls[0] += 1
+                        if calls[0] == 2:
+                            mutate(value)
+                    return value
+                with self.assertRaisesRegex(m.Denied, 'detailed branch protection changed'):
+                    m.decision(self.event, REPO, 'pull_request_target', changing_get)
+                self.assertEqual(calls[0], 2)
+
 if __name__=='__main__': unittest.main()

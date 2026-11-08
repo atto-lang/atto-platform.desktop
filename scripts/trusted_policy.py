@@ -174,6 +174,10 @@ def decision(event, repo, event_name, get):
     # read. A changed review feed is NOT a stable positive assessment.
     require(page_all(get, f'repos/{REPO}/pulls/{number}/reviews', maximum=1000) == reviews,
             'review state changed during metadata audit')
+    # A positive metadata snapshot is invalid if the detailed protection
+    # policy was weakened or replaced during the multi-request audit.
+    require(get(f'repos/{REPO}/branches/main/protection') == protection,
+            'detailed branch protection changed during metadata audit')
     return {'kind': 'METADATA_ONLY_NOT_RELEASE_APPROVAL', 'head_sha': head_sha,
             'base_sha': base_sha, 'sensitive_paths': sensitive,
             'qualified_review_count': len(qualified)}

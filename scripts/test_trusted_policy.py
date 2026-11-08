@@ -331,4 +331,63 @@ class PolicyTests(unittest.TestCase):
         self.db[f'repos/{REPO}/pulls/16/reviews?per_page=100&page=1'].append(None)
         self.deny()
 
+
+    def test_source_free_ci_helpers_require_two_independent_approvals(self):
+        for filename in ('scripts/source-local-admin-probe.sh', 'scripts/new_ci_helper.py',
+                         'SCRIPTS/SOURCE-LOCAL-ADMIN-PROBE.SH'):
+            with self.subTest(filename=filename):
+                self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
+                    {'filename': filename}]
+                self.deny()
+                self.db[f'repos/{REPO}/pulls/16/reviews?per_page=100&page=1'].append(
+                    {'user': {'login': 'security-second'}, 'state': 'APPROVED', 'commit_id': HEAD})
+                self.assertTrue(self.decision()['sensitive_paths'])
+                self.db[f'repos/{REPO}/pulls/16/reviews?per_page=100&page=1'].pop()
+
+    def test_build_and_git_policy_paths_require_security_approval(self):
+        for filename in ('CMakeLists.txt', 'cmake/toolchains/host.cmake', '.gitattributes',
+                         '.gitmodules', 'Makefile', 'TOOLS/compiler-fixtures/check.py'):
+            with self.subTest(filename=filename):
+                self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
+                    {'filename': filename}]
+                self.deny()
+
+    def test_renamed_build_or_source_policy_path_requires_security_approval(self):
+        for original in ('CMakeLists.txt', 'SCRIPTS/helper.sh', '.gitattributes'):
+            with self.subTest(previous_filename=original):
+                self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
+                    {'filename': 'src/ordinary.c', 'previous_filename': original}]
+                self.deny()
+
+    def test_windows_reserved_device_filenames_are_denied(self):
+        for basename in ('CON', 'con.txt', 'PRN', 'AUX.log', 'NUL',
+                         'COM1.txt', 'LPT9', 'COM\u00b9.txt', 'LPT\u00b2.dat',
+                         'CONIN
+, 'CONOUT
+):
+            with self.subTest(name=basename):
+                self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
+                    {'filename': 'src/' + basename}]
+                self.deny()
+
+    def test_cross_platform_trailing_space_dot_and_special_names_are_denied(self):
+        for name in ('trailing.', 'trailing ', 'folder./file.c', '.GIT/config',
+                     'a:b.c', 'a?b', 'a*b', 'a|b', 'a<b', 'a>b', 'quote".c'):
+            with self.subTest(name=name):
+                self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
+                    {'filename': 'src/' + name}]
+                self.deny()
+
+    def test_cross_platform_safe_naming_controls_are_admitted(self):
+        for name in ('COM10.txt', 'LPT10.txt', 'CONTRA.txt', 'file..txt',
+                     'safe-thing.txt', 'caf\u00e9.txt'):
+            with self.subTest(name=name):
+                self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
+                    {'filename': 'src/' + name}]
+                self.assertFalse(self.decision()['sensitive_paths'])
+
+    def test_renamed_windows_reserved_source_path_denied(self):
+        self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
+            {'filename': 'src/safe.c', 'previous_filename': 'src/CON.txt'}]
+        self.deny()
 if __name__=='__main__': unittest.main()

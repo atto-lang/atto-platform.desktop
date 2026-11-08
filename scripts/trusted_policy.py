@@ -18,8 +18,12 @@ OWNER = 'ORESoftware'
 SHA = re.compile(r'^[a-f0-9]{40}$')
 REQUIRED_CHECKS = {'linux-gcc', 'linux-clang', 'linux-sanitizers', 'windows', 'macos'}
 TRUSTED_STATUS_APP_ID = 15368  # Verified GitHub Actions app on current source-repo checks
-SENSITIVE = ('.github/', 'scripts/verify-checkout-raw.py',
-             'scripts/test_', 'scripts/trusted_policy.py')
+# CI helper scripts, Git admission metadata and build entrypoints need 2 reviewers.
+SENSITIVE = ('.github/', 'scripts/', 'tools/', 'cmake/', 'cmakelists.txt',
+             '.gitattributes', '.gitmodules', 'makefile')
+
+# Windows device filenames may alias reserved handles; superscript digits count.
+WIN_RESERVED = re.compile(r'^(?:CONIN\$|CONOUT\$|CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])(?:\.|$)', re.I)
 
 class Denied(Exception):
     pass
@@ -46,8 +50,12 @@ def page_all(get, base, maximum=1000):
 def classify_changed_path(path):
     """Fail closed on nonportable PR file names and classify case-folded sensitive paths."""
     require(type(path) is str and 0 < len(path) <= 4096, 'invalid changed path type/size')
+    parts = path.split('/')
     require(not path.startswith('/') and '\\' not in path and
-            all(piece not in ('', '.', '..') for piece in path.split('/')) and
+            all(piece not in ('', '.', '..') and piece.casefold() != '.git' and
+                not piece.endswith((' ', '.')) and not WIN_RESERVED.match(piece) and
+                not any(char in '<>:"|?*' for char in piece)
+                for piece in parts) and
             all(unicodedata.category(ch) not in ('Cc', 'Cf', 'Cs') for ch in path) and
             unicodedata.normalize('NFC', path) == path,
             'nonportable or ambiguous changed path')

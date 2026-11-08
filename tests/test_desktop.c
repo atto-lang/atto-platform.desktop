@@ -246,10 +246,12 @@ static void title_boundary_matrix(void) {
     raw[124]=0xe2; raw[125]=0x80; raw[126]=0xae;
     check_title_bytes((const char *)raw,sizeof raw,0);
     {
-        const unsigned char max_scalar[]={0xf4,0x8f,0xbf,0xbf};
+        const unsigned char max_noncharacter[]={0xf4,0x8f,0xbf,0xbf};
+        const unsigned char max_neighbor[]={0xf4,0x8f,0xbf,0xbd}; /* U+10FFFD, valid */
         const unsigned char beyond_max[]={0xf4,0x90,0x80,0x80};
         const unsigned char surrogate[]={0xed,0xbf,0xbf};
-        check_title_bytes((const char *)max_scalar,sizeof max_scalar,1);
+        check_title_bytes((const char *)max_noncharacter,sizeof max_noncharacter,0);
+        check_title_bytes((const char *)max_neighbor,sizeof max_neighbor,1);
         check_title_bytes((const char *)beyond_max,sizeof beyond_max,0);
         check_title_bytes((const char *)surrogate,sizeof surrogate,0);
     }

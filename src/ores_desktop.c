@@ -11,6 +11,7 @@ static int title_only_modifier(unsigned int scalar) {
     /* Union of the fail-closed #34 Unicode blank/format coverage and #35's
      * broader modifier coverage. Neither is a Unicode rendering oracle. */
     return (scalar>=0x2000u && scalar<=0x200au) ||
+           scalar==0x1680u || /* Ogham space mark: blank without anchor */
            scalar==0x202fu || scalar==0x205fu || scalar==0x2800u ||
            scalar==0x3000u ||
            (scalar>=0x115fu && scalar<=0x1160u) ||
@@ -58,6 +59,11 @@ static int valid_utf8_title(const char *s, size_t length) {
             for (j=1;j<=extra;++j) {
                 scalar=(scalar<<6) | ((unsigned char)s[i+j] & 0x3fu);
             }
+            /* Unicode noncharacters are legal scalar encodings, but never
+             * meaningful window-title anchors. Deny them even when mixed
+             * with visible text, in every Unicode plane. */
+            if ((scalar>=0xfdd0u && scalar<=0xfdefu) ||
+                (scalar & 0xffffu)>=0xfffeu) return 0;
             if (scalar==0x00adu || scalar==0x034fu || scalar==0x061cu ||
                 scalar==0x180eu || scalar==0x200bu ||
                 scalar==0x200eu || scalar==0x200fu ||

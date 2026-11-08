@@ -298,6 +298,92 @@ static void verify_borrowed_title_snapshot(void) {
     ++total;
 }
 
+
+/* Unicode's designated noncharacter scalar values are valid UTF-8 encodings,
+ * but are not a visible window-title anchor. This is separate from rejecting
+ * malformed UTF-8, whose byte sequences cannot denote Unicode scalars. */
+static size_t encode_scalar(uint32_t value, unsigned char bytes[4]) {
+    if (value<=0x7fu) {
+        bytes[0]=(unsigned char)value;
+        return 1u;
+    }
+    if (value<=0x7ffu) {
+        bytes[0]=(unsigned char)(0xc0u | (value>>6));
+        bytes[1]=(unsigned char)(0x80u | (value & 0x3fu));
+        return 2u;
+    }
+    if (value<=0xffffu) {
+        bytes[0]=(unsigned char)(0xe0u | (value>>12));
+        bytes[1]=(unsigned char)(0x80u | ((value>>6) & 0x3fu));
+        bytes[2]=(unsigned char)(0x80u | (value & 0x3fu));
+        return 3u;
+    }
+    CHECK(value<=0x10ffffu);
+    bytes[0]=(unsigned char)(0xf0u | (value>>18));
+    bytes[1]=(unsigned char)(0x80u | ((value>>12) & 0x3fu));
+    bytes[2]=(unsigned char)(0x80u | ((value>>6) & 0x3fu));
+    bytes[3]=(unsigned char)(0x80u | (value & 0x3fu));
+    return 4u;
+}
+static void verify_noncharacter_scalar(uint32_t scalar) {
+    unsigned char bytes[6];
+    size_t length=encode_scalar(scalar,bytes);
+    verify(bytes,length,0);
+    memmove(bytes+1u,bytes,length);
+    bytes[0]='A';
+    verify(bytes,length+1u,0);
+    memmove(bytes,bytes+1u,length);
+    bytes[length]='A';
+    verify(bytes,length+1u,0);
+}
+static void verify_unicode_noncharacter_and_ogham_policy(void) {
+    unsigned char bytes[128];
+    unsigned plane;
+    uint32_t scalar;
+    size_t length;
+    /* All 32 noncharacters in the permanently reserved BMP range. */
+    for (scalar=0xfdd0u; scalar<=0xfdefu; ++scalar)
+        verify_noncharacter_scalar(scalar);
+    /* Every plane's FFFE/FFFF, including the valid UTF-8 max U+10FFFF. */
+    for (plane=0u; plane<=16u; ++plane) {
+        verify_noncharacter_scalar(((uint32_t)plane<<16)|0xfffeu);
+        verify_noncharacter_scalar(((uint32_t)plane<<16)|0xffffu);
+        /* U+xxFFFD immediately below the noncharacter pair stays admitted. */
+        scalar=((uint32_t)plane<<16)|0xfffdu;
+        length=encode_scalar(scalar,bytes);
+        verify(bytes,length,1);
+    }
+    /* Noncharacters must not widen the rejected range into neighbors. */
+    length=encode_scalar(0xfdcfu,bytes);
+    verify(bytes,length,1);
+    length=encode_scalar(0xfdf0u,bytes);
+    verify(bytes,length,1);
+    length=encode_scalar(0x1681u,bytes); /* Ogham letter, not Ogham space */
+    verify(bytes,length,1);
+
+    /* U+1680 Ogham SPACE MARK must not itself be the only anchor. */
+    length=encode_scalar(0x1680u,bytes);
+    CHECK(length==3u);
+    verify(bytes,length,0);
+    memmove(bytes+1u,bytes,length);
+    bytes[0]='A';
+    verify(bytes,length+1u,1);
+    bytes[0]=(unsigned char)0xe1u;
+    bytes[1]=(unsigned char)0x9au;
+    bytes[2]=(unsigned char)0x80u;
+    bytes[3]='A';
+    verify(bytes,4u,1);
+    /* 42 complete Ogham spaces occupy 126 bytes, no visible content. */
+    for (plane=0u; plane<42u; ++plane) {
+        bytes[plane*3u]=0xe1u;
+        bytes[plane*3u+1u]=0x9au;
+        bytes[plane*3u+2u]=0x80u;
+    }
+    verify(bytes,126u,0);
+    bytes[126u]='A';
+    verify(bytes,127u,1);
+}
+
 int main(void) {
     unsigned char bytes[128];
     verify_every_modifier();
@@ -306,6 +392,7 @@ int main(void) {
     verify_ascii_and_length_boundaries();
     verify_utf8_second_byte_edges();
     verify_borrowed_title_snapshot();
+    verify_unicode_noncharacter_and_ogham_policy();
     unsigned iteration;
     for (iteration=0; iteration<4096; ++iteration) {
         size_t length=0;

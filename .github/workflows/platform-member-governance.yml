@@ -21,6 +21,13 @@ jobs:
           set -euo pipefail
           [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]]
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          # A clean HEAD alone does not prove that the physical manifest and
+          # tests match Git blobs (including case aliases or ignored files).
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          test -z "$(git ls-files --others --ignored --exclude-standard)"
+          for file in .oreslang/integration.json tests/platform-member-governance.test.mjs .github/workflows/platform-member-governance.yml; do
+            test "$(git hash-object --no-filters "$file")" = "$(git rev-parse "HEAD:$file")"
+          done
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'

@@ -52,3 +52,14 @@ See docs/ARCHITECTURE.md and docs/ROADMAP.md for admitted scope and future integ
 ## Explicitly not implemented
 
 Oreslang guest-side desktop FFI, actor/event-loop integration, drawing, accessibility, menus, clipboard, notifications, filesystem grants, packaging, code signing, sandbox entitlements, rendering/GPU, mobile reuse, multiple windows and automated end-to-end GUI tests. A passing host CTest is not proof of any of these.
+
+## Repository ownership and migration (2026-11-08)
+
+**Current home:** `ores-truffle-oreslang/oreslang-platform.desktop` (legacy Oreslang); public language name **AttoLang**. Retain existing `.ores` files and `oreslang-*` dependencies/CLI compatibility; don't infer backend or device capabilities from branding.
+
+- **Owns:** desktop host adapters, native app bootstrap and UI thread/ownership contracts.
+- **Excludes:** managed cloud deployment or billing infrastructure.
+- **Organizations:** [atto-lang](https://github.com/atto-lang) owns compiler/runtime target adapters, language portability, stdlib and conformance. [atto-co](https://github.com/atto-co) owns hosted control planes, deployment, tenancy, billing and managed infrastructure. A similarly named destination repo is not an executed transfer or equivalent runtime.
+- **Proposed initial migration:** approved *ownership transfer* of this repository into `atto-lang/oreslang-platform.desktop` **without renaming**. Preserve the numeric GitHub ID and Git tree. No direct `atto-co` migration is authorized in the current wave; later commercial carve-outs require a separate review.
+
+**Per-repo safety gates:** claim in [coordination issue #26](https://github.com/ores-truffle-oreslang/.github/issues/26), follow private [migration PR #25's runbook](https://github.com/ores-truffle-oreslang/.github/pull/25); record exact head SHA/tree, numeric repository ID, independent security + both admin approvals, target branch protection/rulesets and access, permissions for Actions/secrets/apps/deploy keys, PRs, releases, packages, Pages and dependencies; approve rollback. Never mirror private code without authorization. After a real GitHub transfer, recheck unchanged ID/tree/history, re-establish permissions, update consumer references and rerun exact-head executable tests. `steps=[]` or `null` is `NOT_EXECUTED`; host-only checks do not demonstrate language guest parity, zero-GC, AOT or safe production use.

@@ -224,12 +224,88 @@ static void verify_ascii_and_length_boundaries(void) {
     verify(bytes,4u,1);
 }
 
+
+/* Exercise both sides of every exceptional UTF-8 second-byte boundary:
+ * E0 rejects overlong 3-byte encodings, ED rejects surrogates, F0 rejects
+ * overlong 4-byte encodings, and F4 rejects codepoints above U+10FFFF.
+ * A visible ASCII prefix must neither rescue invalid UTF-8 nor prevent
+ * otherwise valid international scalar titles. */
+static void verify_utf8_second_byte_edges(void) {
+    static const struct { unsigned char first, low, high; size_t length; } ranges[] = {
+        {0xe0u, 0xa0u, 0xbfu, 3u},
+        {0xedu, 0x80u, 0x9fu, 3u},
+        {0xf0u, 0x90u, 0xbfu, 4u},
+        {0xf4u, 0x80u, 0x8fu, 4u}
+    };
+    unsigned char bytes[5];
+    size_t i;
+    unsigned second;
+    for (i=0; i<sizeof(ranges)/sizeof(ranges[0]); ++i) {
+        for (second=0x80u; second<=0xbfu; ++second) {
+            int valid = second>=ranges[i].low && second<=ranges[i].high;
+            bytes[0]='A';
+            bytes[1]=ranges[i].first;
+            bytes[2]=(unsigned char)second;
+            bytes[3]=0x80u;
+            bytes[4]=0x80u;
+            verify(bytes+1,ranges[i].length,valid);
+            verify(bytes,ranges[i].length+1u,valid);
+        }
+    }
+}
+
+/* The host must snapshot borrowed title bytes before backend.open. The
+ * callback is allowed to modify the original writable caller buffer, but
+ * the validated, NUL-terminated title handed to it must not change. */
+static ores_desktop_status opened_poison_borrowed_title(void *p,
+                                                       const ores_desktop_config *cfg) {
+    counters *c=(counters *)p;
+    unsigned char *writable=(unsigned char *)(void *)c->original;
+    CHECK(cfg->title_length==4u);
+    CHECK(cfg->title!=(const char *)writable);
+    CHECK(memcmp(cfg->title,"Atto",4u)==0);
+    CHECK(cfg->title[4]=='\0');
+    ++c->opens;
+    writable[0]=0u;
+    writable[1]=0xffu;
+    writable[2]='!';
+    writable[3]='!';
+    CHECK(memcmp(cfg->title,"Atto",5u)==0);
+    return ORES_DESKTOP_OK;
+}
+static void verify_borrowed_title_snapshot(void) {
+    unsigned char borrowed[]={'A','t','t','o'};
+    counters c={0};
+    ores_desktop_config cfg={ORES_DESKTOP_ABI_VERSION,640,480,1,1,
+                              (const char *)borrowed,sizeof borrowed};
+    ores_desktop_app app={0};
+    ores_desktop_backend backend={0};
+    c.original=borrowed;
+    c.length=sizeof borrowed;
+    app.context=&c;
+    app.on_start=started;
+    app.on_frame=framed;
+    app.on_stop=stopped;
+    backend.context=&c;
+    backend.open=opened_poison_borrowed_title;
+    backend.poll=polled;
+    backend.present=presented;
+    backend.close=closed;
+    CHECK(ores_desktop_run(&cfg,&app,&backend)==ORES_DESKTOP_OK);
+    CHECK(borrowed[0]==0u && borrowed[1]==0xffu);
+    CHECK(c.opens==1u && c.starts==1u && c.polls==1u && c.frames==1u);
+    CHECK(c.presents==1u && c.stops==1u && c.closes==1u);
+    ++total;
+}
+
 int main(void) {
     unsigned char bytes[128];
     verify_every_modifier();
     verify_forbidden_controls();
     verify_invalid_utf8();
     verify_ascii_and_length_boundaries();
+    verify_utf8_second_byte_edges();
+    verify_borrowed_title_snapshot();
     unsigned iteration;
     for (iteration=0; iteration<4096; ++iteration) {
         size_t length=0;

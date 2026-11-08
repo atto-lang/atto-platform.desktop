@@ -116,9 +116,14 @@ def decision(event, repo, event_name, get):
     reviews = page_all(get, f'repos/{REPO}/pulls/{number}/reviews', maximum=1000)
     latest = {}
     for item in reviews:
-        user = (item.get('user') or {}).get('login')
-        if isinstance(user, str):
-            latest[user.casefold()] = item
+        require(type(item) is dict, 'malformed review record')
+        user_record = item.get('user') or {}
+        require(type(user_record) is dict, 'malformed review user')
+        user = user_record.get('login')
+        require(type(user) is str and
+                re.fullmatch(r'[A-Za-z0-9-]{1,39}', user) is not None,
+                'invalid reviewer identity')
+        latest[user.casefold()] = item
     author_name = (pr.get('user') or {}).get('login')
     require(type(author_name) is str and
             re.fullmatch(r'[A-Za-z0-9-]{1,39}', author_name) is not None,
@@ -129,8 +134,11 @@ def decision(event, repo, event_name, get):
                  and r.get('commit_id') == head_sha]
     require(any((r.get('user') or {}).get('login', '').casefold() == OWNER.casefold()
                 for r in qualified), 'current-head CODEOWNER approval missing')
-    require(len(qualified) >= (2 if sensitive else 1),
-            'sensitive PR requires two independent current-head approvals')
+    require(not any(login != author and review.get('state') == 'CHANGES_REQUESTED'
+                    for login, review in latest.items()),
+            'unresolved independent change-request review')
+    require(len(qualified) >= max(needed, 2 if sensitive else 1),
+            'current-head approval count below branch or sensitive-path quorum')
     for review in qualified:
         login = review['user']['login']
         require(re.fullmatch(r'[A-Za-z0-9-]{1,39}', login) is not None,
@@ -154,6 +162,10 @@ def decision(event, repo, event_name, get):
     require(last_branch.get('protected') is True and
             (last_branch.get('commit') or {}).get('sha') == base_sha,
             'main protection or base changed during metadata audit')
+    # Review submissions/dismissals may race with the multi-request metadata
+    # read. A changed review feed is NOT a stable positive assessment.
+    require(page_all(get, f'repos/{REPO}/pulls/{number}/reviews', maximum=1000) == reviews,
+            'review state changed during metadata audit')
     return {'kind': 'METADATA_ONLY_NOT_RELEASE_APPROVAL', 'head_sha': head_sha,
             'base_sha': base_sha, 'sensitive_paths': sensitive,
             'qualified_review_count': len(qualified)}

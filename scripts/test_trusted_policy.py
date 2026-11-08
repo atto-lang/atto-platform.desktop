@@ -24,7 +24,7 @@ class PolicyTests(unittest.TestCase):
             f'repos/{REPO}/branches/main/protection': {
                 'required_status_checks': {'strict': True, 'checks': [
                     {'context': name, 'app_id': m.TRUSTED_STATUS_APP_ID} for name in sorted(m.REQUIRED_CHECKS)]},
-                'required_pull_request_reviews': {'required_approving_review_count': 2,
+                'required_pull_request_reviews': {'required_approving_review_count': 1,
                     'dismiss_stale_reviews': True, 'require_code_owner_reviews': True},
                 'enforce_admins': {'enabled': True},
                 'allow_force_pushes': {'enabled': False},
@@ -244,5 +244,91 @@ class PolicyTests(unittest.TestCase):
         self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
             {'filename': 'src/caf\u00e9.txt'}]
         self.assertFalse(self.decision()['sensitive_paths'])
+
+
+    def test_branch_required_quorum_is_enforced_on_ordinary_pr(self):
+        rule = self.db[f'repos/{REPO}/branches/main/protection']['required_pull_request_reviews']
+        rule['required_approving_review_count'] = 2
+        self.deny()
+        self.db[f'repos/{REPO}/pulls/16/reviews?per_page=100&page=1'].append(
+            {'user': {'login': 'security-second'}, 'state': 'APPROVED', 'commit_id': HEAD})
+        result = self.decision()
+        self.assertEqual(result['qualified_review_count'], 2)
+        self.assertFalse(result['sensitive_paths'])
+
+    def test_branch_required_quorum_three_remains_enforced_for_sensitive_pr(self):
+        self.db[f'repos/{REPO}/branches/main/protection'][
+            'required_pull_request_reviews']['required_approving_review_count'] = 3
+        self.db[f'repos/{REPO}/pulls/16/files?per_page=100&page=1'] = [
+            {'filename': '.github/workflows/security.yml'}]
+        self.db[f'repos/{REPO}/pulls/16/reviews?per_page=100&page=1'].append(
+            {'user': {'login': 'security-second'}, 'state': 'APPROVED', 'commit_id': HEAD})
+        self.deny()
+        self.db[f'repos/{REPO}/collaborators/security-third/permission'] = {
+            'permission': 'maintain'}
+        self.db[f'repos/{REPO}/pulls/16/reviews?per_page=100&page=1'].append(
+            {'user': {'login': 'security-third'}, 'state': 'APPROVED', 'commit_id': HEAD})
+        result = self.decision()
+        self.assertEqual(result['qualified_review_count'], 3)
+        self.assertTrue(result['sensitive_paths'])
+
+    def test_outstanding_changes_requested_blocks_positive_metadata(self):
+        self.db[f'repos/{REPO}/pulls/16/reviews?per_page=100&page=1'].append(
+            {'user': {'login': 'security-second'}, 'state': 'CHANGES_REQUESTED',
+             'commit_id': HEAD})
+        self.deny()
+
+    def test_resolved_changes_requested_allows_new_current_head_approval(self):
+        self.db[f'repos/{REPO}/pulls/16/reviews?per_page=100&page=1'].extend([
+            {'user': {'login': 'security-second'}, 'state': 'CHANGES_REQUESTED',
+             'commit_id': HEAD},
+            {'user': {'login': 'security-second'}, 'state': 'APPROVED',
+             'commit_id': HEAD},
+        ])
+        self.assertEqual(self.decision()['qualified_review_count'], 2)
+
+    def test_moving_review_approval_to_dismissed_during_audit_denied(self):
+        calls = 0
+        path = f'repos/{REPO}/pulls/16/reviews?per_page=100&page=1'
+        def mutating_get(current):
+            nonlocal calls
+            if current == path:
+                calls += 1
+                if calls >= 2:
+                    return [{'user': {'login': 'ORESoftware'}, 'state': 'DISMISSED',
+                             'commit_id': HEAD}]
+            return self.get(current)
+        with self.assertRaises(m.Denied):
+            m.decision(self.event, REPO, 'pull_request_target', mutating_get)
+        self.assertGreaterEqual(calls, 2)
+
+    def test_review_list_addition_during_audit_denied(self):
+        calls = 0
+        path = f'repos/{REPO}/pulls/16/reviews?per_page=100&page=1'
+        def mutating_get(current):
+            nonlocal calls
+            result = self.get(current)
+            if current == path:
+                calls += 1
+                if calls >= 2:
+                    result.append({'user': {'login': 'security-second'},
+                                   'state': 'COMMENTED', 'commit_id': HEAD})
+            return result
+        with self.assertRaises(m.Denied):
+            m.decision(self.event, REPO, 'pull_request_target', mutating_get)
+        self.assertGreaterEqual(calls, 2)
+
+    def test_untrusted_third_party_cannot_satisfy_review_quorum(self):
+        self.db[f'repos/{REPO}/branches/main/protection'][
+            'required_pull_request_reviews']['required_approving_review_count'] = 2
+        self.db[f'repos/{REPO}/pulls/16/reviews?per_page=100&page=1'].append(
+            {'user': {'login': 'security-second'}, 'state': 'APPROVED', 'commit_id': HEAD})
+        self.db[f'repos/{REPO}/collaborators/security-second/permission'] = {
+            'permission': 'read'}
+        self.deny()
+
+    def test_malformed_review_record_is_denied(self):
+        self.db[f'repos/{REPO}/pulls/16/reviews?per_page=100&page=1'].append(None)
+        self.deny()
 
 if __name__=='__main__': unittest.main()

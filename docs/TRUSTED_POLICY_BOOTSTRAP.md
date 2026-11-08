@@ -10,12 +10,12 @@
   **no** `actions/checkout`, PR checkout, uploaded artifact, privileged secret,
   cross-organization carrier, source build, token write or status publication.
 - The workflow fetches only **same-repository policy blob**
-  `94eb55af6fd1e1c505c5663568d3a2e0b51321c3`, then verifies SHA-256
-  `fdbad5892896312ca70bb754f87e46549579f3e8ef5f79bbcfe870d0ecedbb95`
+  `1e8926ab8649860c15ad1a714ccb3207d94186eb`, then verifies SHA-256
+  `d752e397ef66b0182823d32b25a427d34323eaabc054d6eaef4a8d2108ad13d9`
   before executing it from runner temporary storage.
 - The policy compares authoritative PR ID/head/base with event metadata, checks
   branch protection, strict required checks, admin enforcement, and current-head
-  independent reviews. It fully pages changed filenames and reviews. Changes
+  independent reviews (including the effective branch-protection approval quorum). It fully pages changed filenames and reviews. Changes
   under `.github/`, verifier, or policy test files (including renames) require
   two distinct current-head approvals including `ORESoftware`, with reviewer
   write access checked via GitHub's metadata API. Its required checks must

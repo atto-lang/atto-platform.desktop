@@ -119,13 +119,7 @@ ores_desktop_status ores_desktop_run(const ores_desktop_config *c,
                 outcome=ORES_DESKTOP_BACKEND_ERROR; goto cleanup;
             }
             if (!available) break;
-            if (e.type<ORES_DESKTOP_QUIT || e.type>ORES_DESKTOP_POINTER_UP) {
-                outcome=ORES_DESKTOP_BACKEND_ERROR; goto cleanup;
-            }
-            /* x/y encode resize dimensions, not pointer coordinates.
-             * Zero is valid for minimized windows. */
-            if (e.type==ORES_DESKTOP_RESIZE &&
-                (e.x<0 || e.y<0 || e.x>16384 || e.y>16384)) {
+            if (ores_desktop_validate_event(&e) != ORES_DESKTOP_OK) {
                 outcome=ORES_DESKTOP_BACKEND_ERROR; goto cleanup;
             }
             /* Do not let a callback's cast-away-const write change whether

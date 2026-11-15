@@ -150,3 +150,16 @@ cleanup:
     backend.close(backend.context);
     return outcome;
 }
+
+ores_desktop_config ores_desktop_default_config(void) {
+    static const char title[] = "Oreslang";
+    ores_desktop_config config = {0};
+    config.abi_version = ORES_DESKTOP_ABI_VERSION;
+    config.width = 800u;
+    config.height = 600u;
+    config.max_events_per_frame = 64u;
+    config.frame_limit = 0u;
+    config.title = title;
+    config.title_length = sizeof(title) - 1u;
+    return config;
+}

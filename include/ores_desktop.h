@@ -57,6 +57,9 @@ ores_desktop_status ores_desktop_validate_config(const ores_desktop_config *conf
 ores_desktop_status ores_desktop_run(const ores_desktop_config *,
                                     const ores_desktop_app *,
                                     const ores_desktop_backend *);
+/* Deterministic host-only defaults; returned title points to static immutable bytes. */
+ores_desktop_config ores_desktop_default_config(void);
+
 #ifdef __cplusplus
 }
 #endif

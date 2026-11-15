@@ -58,6 +58,17 @@ static int snapshot_title(const char *source, size_t length, char destination[12
 static int valid_status(ores_desktop_status s) {
     return s==ORES_DESKTOP_OK || s==ORES_DESKTOP_STOP;
 }
+ores_desktop_status ores_desktop_validate_event(const ores_desktop_event *event) {
+    if (!event || event->type < ORES_DESKTOP_QUIT ||
+        event->type > ORES_DESKTOP_POINTER_UP)
+        return ORES_DESKTOP_INVALID_ARGUMENT;
+    if (event->type == ORES_DESKTOP_RESIZE &&
+        (event->x < 0 || event->y < 0 ||
+         event->x > 16384 || event->y > 16384))
+        return ORES_DESKTOP_INVALID_ARGUMENT;
+    return ORES_DESKTOP_OK;
+}
+
 ores_desktop_status ores_desktop_run(const ores_desktop_config *c,
                                      const ores_desktop_app *a,
                                      const ores_desktop_backend *b) {

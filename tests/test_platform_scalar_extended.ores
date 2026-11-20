@@ -1,0 +1,30 @@
+// TestSuite reference-model assertions only; not native desktop API execution.
+import class TestCase, TestSuite, TestOptions, TestOutcome, RunSummary from "ores.std/testing";
+import fnc expect_true, run_suite, require_success from "ores.std/testing";
+
+fnc framebuffer_bytes(int width, int height): int { return width * height * 4; }
+
+fnc framebuffer_single_pixel(): TestOutcome {
+  return expect_true(framebuffer_bytes(1,1)==4, "framebuffer_single_pixel scalar reference failed");
+}
+fnc framebuffer_normal(): TestOutcome {
+  return expect_true(framebuffer_bytes(800,500)==1600000, "framebuffer_normal scalar reference failed");
+}
+fnc framebuffer_row(): TestOutcome {
+  return expect_true(framebuffer_bytes(10,1)==40, "framebuffer_row scalar reference failed");
+}
+fnc framebuffer_multirow(): TestOutcome {
+  return expect_true(framebuffer_bytes(3,4)==48, "framebuffer_multirow scalar reference failed");
+}
+pub routine main(): void {
+  val TestSuite suite = new TestSuite("platform-desktop-extended", arr[
+    new TestCase("framebuffer_single_pixel", framebuffer_single_pixel, false, ""),
+    new TestCase("framebuffer_normal", framebuffer_normal, false, ""),
+    new TestCase("framebuffer_row", framebuffer_row, false, ""),
+    new TestCase("framebuffer_multirow", framebuffer_multirow, false, "")
+  ]);
+  val TestOptions options = new TestOptions("", false, true);
+  val RunSummary summary = run_suite(rt borrow suite, rt borrow options);
+  require_success(rt borrow summary);
+  return;
+}

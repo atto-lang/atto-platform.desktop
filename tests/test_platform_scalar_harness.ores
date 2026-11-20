@@ -1,0 +1,28 @@
+// Pure Oreslang scalar reference models; these do not call platform native APIs.
+import class TestCase, TestSuite, TestOptions, TestOutcome, RunSummary from "ores.std/testing";
+import fnc expect_true, run_suite, require_success from "ores.std/testing";
+
+fnc window_dimensions_valid(int width, int height): bool {
+  return width >= 320 && height >= 240 && width <= 8192 && height <= 8192;
+}
+
+fnc initial_window_dimensions(): TestOutcome {
+  return expect_true(window_dimensions_valid(800, 500), "initial_window_dimensions reference assertion failed");
+}
+fnc window_min_max_boundaries(): TestOutcome {
+  return expect_true(window_dimensions_valid(320, 240) && window_dimensions_valid(8192, 8192), "window_min_max_boundaries reference assertion failed");
+}
+fnc window_rejects_invalid_dimensions(): TestOutcome {
+  return expect_true(!window_dimensions_valid(0, 500) && !window_dimensions_valid(800, -1) && !window_dimensions_valid(8193, 500), "window_rejects_invalid_dimensions reference assertion failed");
+}
+pub routine main(): void {
+  val TestSuite suite = new TestSuite("desktop-scalar-reference", arr[
+    new TestCase("initial_window_dimensions", initial_window_dimensions, false, ""),
+    new TestCase("window_min_max_boundaries", window_min_max_boundaries, false, ""),
+    new TestCase("window_rejects_invalid_dimensions", window_rejects_invalid_dimensions, false, "")
+  ]);
+  val TestOptions options = new TestOptions("", false, true);
+  val RunSummary summary = run_suite(rt borrow suite, rt borrow options);
+  require_success(rt borrow summary);
+  return;
+}

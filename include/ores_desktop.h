@@ -55,6 +55,11 @@ uint32_t ores_desktop_abi_version(void);
  * coordinates are unconstrained signed 32-bit values. The host loop
  * revalidates polled events independently of this preflight. */
 ores_desktop_status ores_desktop_validate_event(const ores_desktop_event *event);
+/* Validate host configuration without opening a native window or invoking
+ * callbacks. The title is inspected only for this call. A later run
+ * independently snapshots/validates it to avoid a stale preflight result.
+ * This is a host C ABI utility, not compiled-guest availability proof. */
+ores_desktop_status ores_desktop_validate_config(const ores_desktop_config *config);
 /* Single-threaded UI loop. Successful open always gets one close. */
 ores_desktop_status ores_desktop_run(const ores_desktop_config *,
                                     const ores_desktop_app *,

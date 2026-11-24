@@ -69,6 +69,21 @@ ores_desktop_status ores_desktop_validate_event(const ores_desktop_event *event)
     return ORES_DESKTOP_OK;
 }
 
+static int snapshot_valid_config(const ores_desktop_config *cfg, char title[128]) {
+    return cfg->abi_version==ORES_DESKTOP_ABI_VERSION &&
+           cfg->width>0 && cfg->width<=16384 &&
+           cfg->height>0 && cfg->height<=16384 &&
+           cfg->max_events_per_frame>0 && cfg->max_events_per_frame<=256 &&
+           snapshot_title(cfg->title,cfg->title_length,title);
+}
+ores_desktop_status ores_desktop_validate_config(const ores_desktop_config *config) {
+    ores_desktop_config snapshot;
+    char title[128];
+    if (!config) return ORES_DESKTOP_INVALID_ARGUMENT;
+    snapshot=*config;
+    return snapshot_valid_config(&snapshot,title)
+        ? ORES_DESKTOP_OK : ORES_DESKTOP_INVALID_ARGUMENT;
+}
 ores_desktop_status ores_desktop_run(const ores_desktop_config *c,
                                      const ores_desktop_app *a,
                                      const ores_desktop_backend *b) {
@@ -89,10 +104,7 @@ ores_desktop_status ores_desktop_run(const ores_desktop_config *c,
     cfg=*c;
     app=*a;
     backend=*b;
-    if (cfg.abi_version!=ORES_DESKTOP_ABI_VERSION ||
-        !cfg.width || cfg.width>16384 || !cfg.height || cfg.height>16384 ||
-        !cfg.max_events_per_frame || cfg.max_events_per_frame>256 ||
-        !snapshot_title(cfg.title,cfg.title_length,title) ||
+    if (!snapshot_valid_config(&cfg,title) ||
         (!app.on_start && !app.on_event && !app.on_frame) ||
         !backend.open || !backend.poll || !backend.present || !backend.close)
         return ORES_DESKTOP_INVALID_ARGUMENT;

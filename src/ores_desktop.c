@@ -58,6 +58,17 @@ static int snapshot_title(const char *source, size_t length, char destination[12
 static int valid_status(ores_desktop_status s) {
     return s==ORES_DESKTOP_OK || s==ORES_DESKTOP_STOP;
 }
+ores_desktop_status ores_desktop_validate_event(const ores_desktop_event *event) {
+    if (!event || event->type < ORES_DESKTOP_QUIT ||
+        event->type > ORES_DESKTOP_POINTER_UP)
+        return ORES_DESKTOP_INVALID_ARGUMENT;
+    if (event->type == ORES_DESKTOP_RESIZE &&
+        (event->x < 0 || event->y < 0 ||
+         event->x > 16384 || event->y > 16384))
+        return ORES_DESKTOP_INVALID_ARGUMENT;
+    return ORES_DESKTOP_OK;
+}
+
 static int snapshot_valid_config(const ores_desktop_config *cfg, char title[128]) {
     return cfg->abi_version==ORES_DESKTOP_ABI_VERSION &&
            cfg->width>0 && cfg->width<=16384 &&
@@ -120,13 +131,7 @@ ores_desktop_status ores_desktop_run(const ores_desktop_config *c,
                 outcome=ORES_DESKTOP_BACKEND_ERROR; goto cleanup;
             }
             if (!available) break;
-            if (e.type<ORES_DESKTOP_QUIT || e.type>ORES_DESKTOP_POINTER_UP) {
-                outcome=ORES_DESKTOP_BACKEND_ERROR; goto cleanup;
-            }
-            /* x/y encode resize dimensions, not pointer coordinates.
-             * Zero is valid for minimized windows. */
-            if (e.type==ORES_DESKTOP_RESIZE &&
-                (e.x<0 || e.y<0 || e.x>16384 || e.y>16384)) {
+            if (ores_desktop_validate_event(&e) != ORES_DESKTOP_OK) {
                 outcome=ORES_DESKTOP_BACKEND_ERROR; goto cleanup;
             }
             /* Do not let a callback's cast-away-const write change whether

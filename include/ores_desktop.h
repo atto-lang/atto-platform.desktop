@@ -50,6 +50,11 @@ typedef struct {
     void (*close)(void *);
 } ores_desktop_backend;
 uint32_t ores_desktop_abi_version(void);
+/* Pure validation of a single host/backend event; no callbacks or writes.
+ * Resize x/y are dimensions in [0,16384] (zero means minimized). Other
+ * coordinates are unconstrained signed 32-bit values. The host loop
+ * revalidates polled events independently of this preflight. */
+ores_desktop_status ores_desktop_validate_event(const ores_desktop_event *event);
 /* Validate host configuration without opening a native window or invoking
  * callbacks. The title is inspected only for this call. A later run
  * independently snapshots/validates it to avoid a stale preflight result.

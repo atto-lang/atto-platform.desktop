@@ -123,6 +123,12 @@ ores_desktop_status ores_desktop_run(const ores_desktop_config *c,
             if (e.type<ORES_DESKTOP_QUIT || e.type>ORES_DESKTOP_POINTER_UP) {
                 outcome=ORES_DESKTOP_BACKEND_ERROR; goto cleanup;
             }
+            /* x/y encode resize dimensions, not pointer coordinates.
+             * Zero is valid for minimized windows. */
+            if (e.type==ORES_DESKTOP_RESIZE &&
+                (e.x<0 || e.y<0 || e.x>16384 || e.y>16384)) {
+                outcome=ORES_DESKTOP_BACKEND_ERROR; goto cleanup;
+            }
             /* Do not let a callback's cast-away-const write change whether
              * the host honors an already validated quit event. */
             polled_type=e.type;

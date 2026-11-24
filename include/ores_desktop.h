@@ -18,7 +18,9 @@ typedef enum {
     ORES_DESKTOP_POINTER_MOVE=5, ORES_DESKTOP_POINTER_DOWN=6,
     ORES_DESKTOP_POINTER_UP=7
 } ores_desktop_event_type;
-/* In-process layout, not a wire protocol. key codes are backend scancodes. */
+/* In-process layout, not a wire protocol. key codes are backend scancodes.
+ * For RESIZE only, x/y are dimensions in [0,16384]; 0 means minimized.
+ * Other event coordinates may be outside the window. */
 typedef struct {
     uint32_t type, code;
     int32_t x, y;

@@ -13,11 +13,11 @@ executes that same checkout's verifier, an attacker can replace the program with
 The desktop workflow now:
 
 1. Checks out exact **same-repository** commit
-   `db3717cd0b2e2bc3ef542848582dc51238c7d768`, using a SHA-pinned
+   `27f2c9aa6d67a7e2302ba27d643907fa28c352f9`, using a SHA-pinned
    `actions/checkout` and non-persistent credentials.
 2. Uses **inline Python** in the workflow (not a PR-file helper) to verify the
    verifier bytes' SHA-256
-   `bb2b487c59826eefe075edc93cf3cb7ed56ae81c6efa09ac40afb25d3f51e6d9`.
+   `727948bdaa80a5a2f8b391673eb7ad01235dcae78d4de7481c80aae74fa4e156`.
    A mismatched source aborts before writing the snapshot.
 3. Copies those verified bytes to
    `$RUNNER_TEMP/ores-desktop-pinned-verifier.py`, outside the working checkout.

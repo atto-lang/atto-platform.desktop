@@ -18,6 +18,7 @@ static struct {
  unsigned events, frames, starts, stops;
  ores_desktop_event last;
  ores_desktop_status event_result, start_result;
+ unsigned probe_rival;
 } app;
 static void reset(void){ memset(&mock,0,sizeof mock);memset(&app,0,sizeof app); }
 static void enqueue(SDL_Event e){CHECK(mock.queued<128);mock.events[mock.queued++]=e;}
@@ -30,8 +31,35 @@ SDL_Window *SDL_CreateWindow(const char *title,int width,int height,uint64_t fla
 }
 void SDL_DestroyWindow(SDL_Window *p){CHECK(p==&window_object);++mock.destroy_count;}
 bool SDL_PollEvent(SDL_Event *e){++mock.poll_count;if(mock.next==mock.queued)return false;*e=mock.events[mock.next++];return true;}
+SDL_Window *SDL_GetWindowFromEvent(const SDL_Event *e){
+ if (!e || e->type==SDL_EVENT_QUIT) return NULL;
+ switch(e->type) {
+ case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+ case SDL_EVENT_WINDOW_RESIZED:
+ case SDL_EVENT_KEY_DOWN:
+ case SDL_EVENT_KEY_UP:
+ case SDL_EVENT_MOUSE_MOTION:
+ case SDL_EVENT_MOUSE_BUTTON_DOWN:
+ case SDL_EVENT_MOUSE_BUTTON_UP:
+   return e->window.windowID==23u ? &window_object : NULL;
+ default: return NULL;
+ }
+}
 void SDL_Delay(uint32_t ms){CHECK(ms==16);++mock.delay_count;}
-static ores_desktop_status start_app(void *x){(void)x;++app.starts;return app.start_result;}
+static ores_desktop_status start_app(void *x){
+ (void)x;++app.starts;
+ if (app.probe_rival) {
+   ores_desktop_sdl3_state rival={0};
+   ores_desktop_backend b=ores_desktop_sdl3_backend(&rival);
+   ores_desktop_config cfg={ORES_DESKTOP_ABI_VERSION,320,240,2,1,"mock SDL3",9};
+   CHECK(b.open(b.context,&cfg)==ORES_DESKTOP_BACKEND_ERROR);
+   // Foreign close cannot clear current window's event-loop lease.
+   b.close(b.context);
+   CHECK(b.open(b.context,&cfg)==ORES_DESKTOP_BACKEND_ERROR);
+   CHECK(mock.init_count==1 && mock.create_count==1);
+ }
+ return app.start_result;
+}
 static ores_desktop_status event_app(void *x,const ores_desktop_event *e){
  (void)x;CHECK(e);++app.events;app.last=*e;return app.event_result;
 }
@@ -60,7 +88,7 @@ static void test_lifecycle(void){
  reset();app.start_result=ORES_DESKTOP_STOP;CHECK(execute(&s,1)==ORES_DESKTOP_OK);
  verify_closed(&s,1,1,1,1);CHECK(app.starts==1 && app.stops==1 && app.frames==0 && mock.delay_count==0);
  reset();app.event_result=ORES_DESKTOP_APP_ERROR;
- SDL_Event e={0};e.type=SDL_EVENT_KEY_DOWN;enqueue(e);
+ SDL_Event e={0};e.type=SDL_EVENT_KEY_DOWN;e.key.windowID=23u;enqueue(e);
  CHECK(execute(&s,2)==ORES_DESKTOP_APP_ERROR);verify_closed(&s,1,1,1,1);
  CHECK(app.events==1 && app.frames==0 && app.stops==1);
  reset();s.initialized=1;CHECK(execute(&s,1)==ORES_DESKTOP_BACKEND_ERROR);
@@ -71,12 +99,24 @@ static void test_lifecycle(void){
  s.window=NULL;
 }
 static void check_event(SDL_Event e,uint32_t type,uint32_t code,int32_t x,int32_t y,int quit){
- ores_desktop_sdl3_state s={0};reset();enqueue(e);
+ ores_desktop_sdl3_state s={0};reset();
+ if (e.type!=SDL_EVENT_QUIT) e.window.windowID=23u;
+ enqueue(e);
  CHECK(execute(&s,2)==ORES_DESKTOP_OK);
  CHECK(app.events==1 && app.last.type==type && app.last.code==code);
  CHECK(app.last.x==x && app.last.y==y);
  CHECK(app.frames==(quit?0u:2u)); CHECK(mock.delay_count==(quit?0u:2u));
  CHECK(app.stops==1);verify_closed(&s,1,1,1,1);
+}
+static void test_exclusive_event_pump(void){
+ ores_desktop_sdl3_state s={0};
+ reset();app.probe_rival=1;
+ CHECK(execute(&s,1)==ORES_DESKTOP_OK);
+ verify_closed(&s,1,1,1,1);
+ CHECK(app.starts==1 && app.stops==1 && app.frames==1);
+ // Successful close releases admission so a subsequent host can run.
+ reset();CHECK(execute(&s,1)==ORES_DESKTOP_OK);
+ verify_closed(&s,1,1,1,1);
 }
 static void test_event_translation(void){
  SDL_Event e={0};e.type=SDL_EVENT_QUIT;
@@ -101,6 +141,25 @@ static void test_event_translation(void){
  e.button.type=SDL_EVENT_MOUSE_BUTTON_UP;
  check_event(e,ORES_DESKTOP_POINTER_UP,3,12,-4,0);
 }
+static void test_foreign_window_events(void){
+ ores_desktop_sdl3_state s={0}; reset(); SDL_Event e={0};
+ // Foreign close must never terminate our window or reach app.on_event.
+ e.window.type=SDL_EVENT_WINDOW_CLOSE_REQUESTED;e.window.windowID=99u;enqueue(e);
+ e.key.type=SDL_EVENT_KEY_DOWN;e.key.windowID=23u;e.key.scancode=71;enqueue(e);
+ e.motion.type=SDL_EVENT_MOUSE_MOTION;e.motion.windowID=99u;enqueue(e);
+ e.window.type=SDL_EVENT_WINDOW_RESIZED;e.window.windowID=23u;
+ e.window.data1=640;e.window.data2=480;enqueue(e);
+ CHECK(execute(&s,2)==ORES_DESKTOP_OK);
+ CHECK(app.events==2 && app.frames==2 && app.stops==1);
+ CHECK(app.last.type==ORES_DESKTOP_RESIZE && app.last.x==640 && app.last.y==480);
+ CHECK(mock.next==4);verify_closed(&s,1,1,1,1);
+ // A foreign-only close must not suppress a frame or cause QUIT.
+ reset();e.window.type=SDL_EVENT_WINDOW_CLOSE_REQUESTED;
+ e.window.windowID=99u;enqueue(e);
+ CHECK(execute(&s,1)==ORES_DESKTOP_OK);
+ CHECK(app.events==0 && app.frames==1 && app.stops==1);
+ verify_closed(&s,1,1,1,1);
+}
 static void test_unrecognized_bound(void){
  ores_desktop_sdl3_state s={0};reset();SDL_Event e={0};e.type=0xf00u;
  for(unsigned i=0;i<65;i++)enqueue(e);
@@ -109,8 +168,46 @@ static void test_unrecognized_bound(void){
  CHECK(app.frames==1 && mock.delay_count==1);
  verify_closed(&s,1,1,1,1);
 }
+
+static void test_foreign_input_cannot_impersonate_our_window(void){
+ ores_desktop_sdl3_state s={0}; SDL_Event e={0}; reset();
+ e.key.type=SDL_EVENT_KEY_DOWN; e.key.windowID=99u; e.key.scancode=42; enqueue(e);
+ e.key.type=SDL_EVENT_KEY_UP; e.key.windowID=99u; enqueue(e);
+ e.button.type=SDL_EVENT_MOUSE_BUTTON_DOWN; e.button.windowID=99u; enqueue(e);
+ e.button.type=SDL_EVENT_MOUSE_BUTTON_UP; e.button.windowID=99u; enqueue(e);
+ e.motion.type=SDL_EVENT_MOUSE_MOTION; e.motion.windowID=99u; enqueue(e);
+ CHECK(execute(&s,2)==ORES_DESKTOP_OK);
+ CHECK(app.events==0 && app.frames==2 && app.stops==1);
+ CHECK(mock.next==5); verify_closed(&s,1,1,1,1);
+}
+static void test_global_quit_survives_foreign_event_flood(void){
+ ores_desktop_sdl3_state s={0}; SDL_Event e={0}; reset();
+ for(unsigned i=0;i<10;i++){
+   e.window.type=SDL_EVENT_WINDOW_CLOSE_REQUESTED;
+   e.window.windowID=99u; enqueue(e);
+ }
+ e.type=SDL_EVENT_QUIT; enqueue(e);
+ CHECK(execute(&s,2)==ORES_DESKTOP_OK);
+ CHECK(app.events==1 && app.last.type==ORES_DESKTOP_QUIT);
+ CHECK(app.frames==0 && app.stops==1 && mock.next==11);
+ verify_closed(&s,1,1,1,1);
+}
+static void test_unknown_own_window_event_cannot_inject_guest_callback(void){
+ ores_desktop_sdl3_state s={0}; SDL_Event e={0}; reset();
+ e.window.type=0xf001u; e.window.windowID=23u; enqueue(e);
+ e.key.type=SDL_EVENT_KEY_DOWN; e.key.windowID=23u;
+ e.key.scancode=9u; enqueue(e);
+ CHECK(execute(&s,1)==ORES_DESKTOP_OK);
+ CHECK(app.events==1 && app.last.type==ORES_DESKTOP_KEY_DOWN);
+ CHECK(app.last.code==9u && app.frames==1 && mock.next==2);
+ verify_closed(&s,1,1,1,1);
+}
+
 int main(void){
- test_lifecycle();test_event_translation();test_unrecognized_bound();
+ test_lifecycle();test_exclusive_event_pump();test_event_translation();test_foreign_window_events();test_unrecognized_bound();
+ test_foreign_input_cannot_impersonate_our_window();
+ test_global_quit_survives_foreign_event_flood();
+ test_unknown_own_window_event_cannot_inject_guest_callback();
  puts("desktop SDL3 mock lifecycle/translation/bounded-drain: PASS (not real SDL3)");
  return 0;
 }

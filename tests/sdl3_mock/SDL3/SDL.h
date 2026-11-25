@@ -16,15 +16,16 @@ typedef struct SDL_Window SDL_Window;
 #define SDL_EVENT_MOUSE_BUTTON_UP 0x108u
 typedef union SDL_Event {
     uint32_t type;
-    struct {uint32_t type; int32_t data1, data2;} window;
-    struct {uint32_t type; int32_t scancode;} key;
-    struct {uint32_t type; float x, y;} motion;
-    struct {uint32_t type; float x, y; unsigned char button;} button;
+    struct {uint32_t type; uint32_t windowID; int32_t data1, data2;} window;
+    struct {uint32_t type; uint32_t windowID; int32_t scancode;} key;
+    struct {uint32_t type; uint32_t windowID; float x, y;} motion;
+    struct {uint32_t type; uint32_t windowID; float x, y; unsigned char button;} button;
 } SDL_Event;
 bool SDL_InitSubSystem(uint32_t flags);
 void SDL_QuitSubSystem(uint32_t flags);
 SDL_Window *SDL_CreateWindow(const char *title,int width,int height,uint64_t flags);
 void SDL_DestroyWindow(SDL_Window *window);
 bool SDL_PollEvent(SDL_Event *event);
+SDL_Window *SDL_GetWindowFromEvent(const SDL_Event *event);
 void SDL_Delay(uint32_t ms);
 #endif

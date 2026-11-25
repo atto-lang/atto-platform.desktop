@@ -12,7 +12,7 @@ permissions:
   pull-requests: read
 jobs:
   sourcefree-policy:
-    if: github.repository == 'ores-truffle-oreslang/oreslang-platform.desktop' && github.event.pull_request.base.ref == 'main'
+    if: github.repository == 'atto-lang/atto-platform.desktop' && github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -22,8 +22,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api --method GET repos/ores-truffle-oreslang/oreslang-platform.desktop/git/blobs/bed97e32935fd25b316925dea5e0cb1e314bf719 --jq .content | base64 -d > "$RUNNER_TEMP/desktop-trusted-policy.py"
-          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path(os.environ["RUNNER_TEMP"],"desktop-trusted-policy.py").read_bytes(); sys.exit(0 if hashlib.sha256(raw).hexdigest()=="6b523de2115079cbdeea2d1655df2aee77337fc7b8289e9aad87ac1e26e6f505" else "POLICY_BLOB_MISMATCH")'
+          gh api --method GET repos/atto-lang/atto-platform.desktop/git/blobs/b2f4f8d6f69b818e3c900b4bbe3131e8533b15a5 --jq .content | base64 -d > "$RUNNER_TEMP/desktop-trusted-policy.py"
+          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path(os.environ["RUNNER_TEMP"],"desktop-trusted-policy.py").read_bytes(); sys.exit(0 if hashlib.sha256(raw).hexdigest()=="fd5a495879d70960c3193c6450b2a6cc27a3d882331d9e2ac5fc32f05fdb27f2" else "POLICY_BLOB_MISMATCH")'
       - name: Run pinned default-branch policy against PR metadata only
         shell: bash
         env:

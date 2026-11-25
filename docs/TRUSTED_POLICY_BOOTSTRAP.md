@@ -10,8 +10,8 @@
   **no** `actions/checkout`, PR checkout, uploaded artifact, privileged secret,
   cross-organization carrier, source build, token write or status publication.
 - The workflow fetches only **same-repository policy blob**
-  `5ccd5a27ad8b595728dfb39e85c6a8e167f2b723`, then verifies SHA-256
-  `a8511f7bd50a72101197ab20994fcc10c55138b68e64e62b74f151de1d83642b`
+  `b2f4f8d6f69b818e3c900b4bbe3131e8533b15a5`, then verifies SHA-256
+  `fd5a495879d70960c3193c6450b2a6cc27a3d882331d9e2ac5fc32f05fdb27f2`
   before executing it from runner temporary storage.
 - The policy compares authoritative PR ID/head/base with event metadata, checks
   branch protection, strict required checks, admin enforcement, and current-head
@@ -28,7 +28,7 @@
 
 ## Fail-closed limitations
 
-1. The pinned blob currently comes from **draft PR #14**, not an independently
+1. The pinned blob currently comes from **draft PR #10**, not an independently
    approved, protected policy release. A digest guarantees bytes, not trust.
 2. The policy calls `GET /branches/main/protection`, which GitHub documents as
    requiring **Administration: read**. The narrowly scoped automatic

@@ -4,8 +4,8 @@ import unittest
 import yaml
 
 WF = Path(__file__).resolve().parent.parent / '.github' / 'workflows' / 'desktop-trusted-pr-metadata-policy.yml'
-BLOB = 'bed97e32935fd25b316925dea5e0cb1e314bf719'
-DIGEST = '6b523de2115079cbdeea2d1655df2aee77337fc7b8289e9aad87ac1e26e6f505'
+BLOB = 'b2f4f8d6f69b818e3c900b4bbe3131e8533b15a5'
+DIGEST = 'fd5a495879d70960c3193c6450b2a6cc27a3d882331d9e2ac5fc32f05fdb27f2'
 
 class WorkflowTests(unittest.TestCase):
     def setUp(self):
@@ -39,6 +39,6 @@ class WorkflowTests(unittest.TestCase):
     def test_gated_main_only(self):
         expression = self.workflow['jobs']['sourcefree-policy']['if']
         self.assertIn("github.event.pull_request.base.ref == 'main'", expression)
-        self.assertIn("github.repository == 'ores-truffle-oreslang/oreslang-platform.desktop'", expression)
+        self.assertIn("github.repository == 'atto-lang/atto-platform.desktop'", expression)
 
 if __name__ == '__main__': unittest.main()

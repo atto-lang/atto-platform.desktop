@@ -11,7 +11,7 @@ permissions: {}
 
 jobs:
   allocation-only:
-    if: github.repository == 'ores-truffle-oreslang/oreslang-platform.desktop'
+    if: github.repository == 'atto-lang/atto-platform.desktop'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -23,11 +23,12 @@ jobs:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          expected_repo='ores-truffle-oreslang/oreslang-platform.desktop'
+          expected_repo='atto-lang/atto-platform.desktop'
           [[ "${GITHUB_REPOSITORY:-}" == "$expected_repo" ]]
           [[ "${EVENT_NAME:-}" == pull_request || "${EVENT_NAME:-}" == workflow_dispatch ]]
           [[ -n "${RUNNER_NAME:-}" && -n "${RUNNER_OS:-}" && -n "${RUNNER_ARCH:-}" ]]
           [[ "${GITHUB_RUN_ID:-}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${GITHUB_RUN_ATTEMPT:-}" =~ ^[1-9][0-9]*$ ]]
           [[ "${GITHUB_SHA:-}" =~ ^[0-9a-f]{40}$ ]]
 
           case "$EVENT_NAME" in

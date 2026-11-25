@@ -1,3 +1,5 @@
+> Historical incident record from the archived Oreslang organization. The current canonical repository is `atto-lang/atto-platform.desktop`; re-verify current protection, review and runner settings before relying on this record.
+
 # Desktop source-local CI administration and release gates
 
 > Operator runbook, not a CI success attestation. This document must **not**

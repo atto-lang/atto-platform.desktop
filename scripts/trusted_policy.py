@@ -13,7 +13,7 @@ import unicodedata
 import sys
 from pathlib import Path
 
-REPO = 'ores-truffle-oreslang/oreslang-platform.desktop'
+REPO = 'atto-lang/atto-platform.desktop'
 OWNER = 'ORESoftware'
 SHA = re.compile(r'^[a-f0-9]{40}$')
 REQUIRED_CHECKS = {'linux-gcc', 'linux-clang', 'linux-sanitizers', 'windows', 'macos'}

@@ -11,7 +11,7 @@ permissions:
   contents: read
 jobs:
   synthetic-evidence-regressions:
-    if: github.repository == 'ores-truffle-oreslang/oreslang-platform.desktop'
+    if: github.repository == 'atto-lang/atto-platform.desktop'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

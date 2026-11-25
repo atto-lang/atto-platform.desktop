@@ -15,11 +15,11 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 2
 fi
 
-owner='ores-truffle-oreslang'
+owner='atto-lang'
 repos=(
-  oreslang-platform.mobile oreslang-platform.iot oreslang-platform.embedded
-  oreslang-platform.desktop oreslang-platform.fpga oreslang-platform.asic
-  oreslang-platform-conformance
+  atto-platform.mobile atto-platform.iot atto-platform.embedded
+  atto-platform.desktop atto-platform.fpga atto-platform.asic
+  atto-platform-conformance
 )
 
 # Never print stderr from GitHub API: account identifiers or extensions may appear there.
@@ -44,7 +44,7 @@ done
 for entry in "canary:$canary" "host:$host"; do
   label=${entry%%:*}
   run=${entry#*:}
-  endpoint="repos/$owner/oreslang-platform.desktop/actions/runs/$run"
+  endpoint="repos/$owner/atto-platform.desktop/actions/runs/$run"
   state=$(read_field "$endpoint" '[.id, .event, .head_sha, .status, .conclusion] | @tsv' || true)
   jobs=$(read_field "$endpoint/jobs?per_page=100" '.jobs[] | [.name, (.runner_id // 0), ((.steps // []) | length), .status, .conclusion] | @tsv' || true)
   printf '%s run=%s metadata=%s\n' "$label" "$run" "${state:-UNAVAILABLE}"

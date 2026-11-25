@@ -1,0 +1,11 @@
+// Compilable scalar subset of oreslang-source.llvm. No guest main or host imports.
+pub fnc desktop_initial_width(): int {
+    return 800;
+}
+pub fnc desktop_initial_height(): int {
+    return 500;
+}
+
+fnc desktop_unreachable_probe(): int {
+    return 999;
+}

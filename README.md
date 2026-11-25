@@ -1,54 +1,49 @@
-# Oreslang Desktop
+> **AI agent instructions (organization-wide):** Before working on code, issues, or pull requests, read and follow the [organization `AGENTS.md`](https://github.com/atto-lang/.github/blob/main/AGENTS.md), including its **merge-first stealth-development policy**. Honor any repository-local `AGENTS.md`, explicit holds, and GitHub-enforced rules.
 
-Native desktop platform bootstrap for [Oreslang LLVM](https://github.com/ores-truffle-oreslang/oreslang-source.llvm).
+# atto-platform.desktop
 
-**Status: experimental host ABI and SDL3 window/event adapter.** This is not yet a desktop GUI framework, an Oreslang actor runtime, or a compiler extension. It intentionally builds and tests without LLVM, SDL3, a display server, or privileged OS APIs.
+Desktop runtime, native windowing, and platform integration for AttoLang applications.
 
-## Native host CI
+## Naming migration and language authority
 
-Requires CMake 3.20+ and a C11 compiler.
+This repository is maintained at [atto-lang/atto-platform.desktop](https://github.com/atto-lang/atto-platform.desktop); use `https://github.com/atto-lang/atto-platform.desktop.git` for Git remotes and canonical `.atto` source examples. The normative language contract is [atto-spec](https://github.com/atto-lang/atto-spec), with executable guest evidence tracked by [atto-platform-conformance](https://github.com/atto-lang/atto-platform-conformance). Follow current ownership, borrowing, effects, actor, and syntax rules there; do not infer implemented features from a README or unexecuted CI.
 
-~~~sh
-cmake -S . -B build -DBUILD_TESTING=ON
-cmake --build build
-ctest --test-dir build --output-on-failure
-~~~
+## Scope
 
-This proves the small in-process C host ABI, deterministic application lifecycle, input event contract and error cleanup on a fake backend. The headless test does not display a window.
+Desktop target support, windowing, platform APIs, packaging, and native integration.
 
-## Open a real desktop window (SDL3)
+## Portability contract
 
-Install the SDL3 development package so CMake can resolve SDL3::SDL3. Then:
+The AttoLang language contract must remain separate from target-specific capabilities. Document supported toolchains, devices, platform APIs, memory limits, runtime constraints, and unsupported features explicitly.
 
-~~~sh
-cmake -S . -B build-sdl -DORES_DESKTOP_WITH_SDL3=ON
-cmake --build build-sdl
-./build-sdl/ores_desktop_demo
-~~~
+## Verification
 
-On Windows, run the built executable from the chosen generator's configuration directory. On macOS, invoke it on the UI/main thread. The demo opens a resizable blank native window, reports resize events, and exits cleanly on close. It intentionally has **no renderer** yet: it does not draw widgets or execute Oreslang code.
+Where feasible, use real devices or representative emulators in addition to host-side tests. Record toolchain versions, target profiles, exact commit SHAs, and execution evidence. A successful build alone is not proof of runtime semantics.
 
-## LLVM-native code linkage
+## Development status
 
-The LLVM compiler's current admitted host subset can emit ordinary exported i64 scalar functions without a guest main. Use that to link native Oreslang logic into a C-host desktop application. This does **not** mean arbitrary C imports, UI callbacks, or actor messages compile in Oreslang today.
+This is a statement of intended project responsibilities. Consult source files and CI for verified implementation or release status; do not assume all targets are supported.
 
-After building oreslang-source.llvm, run:
+## Related projects
 
-~~~sh
-./scripts/llvm-link-smoke.sh /path/to/oreslang-source.llvm/build/oreslang-llvmc
-~~~
+- [AttoLang](https://github.com/atto-lang)
+- [Target profiles](https://github.com/atto-lang/atto-target-profiles)
+- [Platform conformance](https://github.com/atto-lang/atto-platform-conformance)
 
-The smoke uses examples/guest_config.ores, compiles it to LLVM IR, links it with examples/llvm_host_bridge.c and the desktop C host, and executes an OS-native headless binary. It requires Clang at build time, not at runtime. It intentionally fails when the compiler or target ABI cannot link; no interpreter fallback.
+## Repository ownership and contribution routing
 
-## Design
+**Belongs here:** Desktop app/window lifecycle, OS-specific event loops, native packaging/installers and desktop target compatibility.
 
-- Oreslang LLVM: source verification, native IR, AOT objects. It owns guest calling conventions and future host imports.
-- ores_desktop: versioned single-threaded host event-loop C ABI, bounded polling and explicit lifecycle.
-- ores_desktop_sdl3: optional native window/input backend for Linux, macOS and Windows, without embedding SDL pointers in the stable event type.
-- Apps: native C callbacks for now. No borrowed event pointer can outlive a callback, and no C++ exception should cross this boundary.
+**Belongs elsewhere:** Portable UI widgets and rendering contracts belong in atto-runtime-ui; code generation in atto-source.*; shared target constraints in atto-target-profiles.
 
-See docs/ARCHITECTURE.md and docs/ROADMAP.md for admitted scope and future integrations. Compare oreslang-platform.mobile's portable host-ABI bootstrap.
+**Security and portability boundary:** Restrict filesystem/network/process capabilities and UI-thread access; test real Windows/macOS/Linux targets and resource cleanup before claiming portability.
 
-## Explicitly not implemented
+AttoLang is the canonical project name; new source, examples and documentation use `.atto` and the `atto-lang` repository organization. This README defines scope, not feature readiness.
 
-Oreslang guest-side desktop FFI, actor/event-loop integration, drawing, accessibility, menus, clipboard, notifications, filesystem grants, packaging, code signing, sandbox entitlements, rendering/GPU, mobile reuse, multiple windows and automated end-to-end GUI tests. A passing host CTest is not proof of any of these.
+**Acceptance:** name exact source SHA/tree, runtime/toolchain, positive and negative checks and execution receipt before claiming support. Host-only tests and empty CI steps do not prove guest execution.
+
+## Legacy migration provenance and gates
+
+The original `ores-truffle-oreslang/oreslang-platform.desktop` repository is archived; the current AttoLang repository has a separate numeric GitHub ID. Historical `.ores` files and CLI/package names are compatibility history, not evidence of current `.atto` execution. Desktop host adapters, native app bootstrap and UI-thread ownership contracts belong here; managed cloud deployment and billing do not. Host-only checks do not establish guest parity, AOT, zero-GC or safe production use.
+
+[atto-lang](https://github.com/atto-lang) owns language, portable libraries, runtime/compiler contracts and demos; [atto-co](https://github.com/atto-co) owns managed production services, tenancy, billing and deployment. Any future original-ID transfer or commercial carve-out requires separate owner approval and security review. Inventory exact SHA/tree, numeric ID, protections, permissions, PRs, releases, packages, dependencies, runners, secrets, applications, webhooks, Pages and rollback owner; verify preservation and retest references after an actual transfer. Never mirror private code without authorization. Zero-step jobs are NOT_EXECUTED; host-only checks do not establish compiled guest execution or production readiness.

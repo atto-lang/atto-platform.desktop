@@ -14,12 +14,12 @@ jobs:
       - name: Checkout pinned verifier commit (same private repository)
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: 384ae50e3fa76caa02d7697b2d6934c9aa955a58
+          ref: 27f2c9aa6d67a7e2302ba27d643907fa28c352f9
           persist-credentials: false
       - name: Pin verifier bytes outside candidate checkout
         shell: bash
         run: |
-          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="0b8e142de195cd752f3c35aaca35cacaf6d7d6add71a34d4cd3eab597c8c04a8" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
+          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="727948bdaa80a5a2f8b391673eb7ad01235dcae78d4de7481c80aae74fa4e156" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
       - name: Checkout candidate exact source HEAD
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -51,12 +51,12 @@ jobs:
       - name: Checkout pinned verifier commit (same private repository)
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: 384ae50e3fa76caa02d7697b2d6934c9aa955a58
+          ref: 27f2c9aa6d67a7e2302ba27d643907fa28c352f9
           persist-credentials: false
       - name: Pin verifier bytes outside candidate checkout
         shell: bash
         run: |
-          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="0b8e142de195cd752f3c35aaca35cacaf6d7d6add71a34d4cd3eab597c8c04a8" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
+          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="727948bdaa80a5a2f8b391673eb7ad01235dcae78d4de7481c80aae74fa4e156" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
       - name: Checkout candidate exact source HEAD
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -79,19 +79,19 @@ jobs:
       - run: cmake --build build --parallel 2
       - run: ctest --test-dir build --output-on-failure
   macos:
-    runs-on: macos-latest
+    runs-on: macos-15
     timeout-minutes: 20
     steps:
       # Immutable *content* pin, not an independent trust root until reviewed/protected.
       - name: Checkout pinned verifier commit (same private repository)
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: 384ae50e3fa76caa02d7697b2d6934c9aa955a58
+          ref: 27f2c9aa6d67a7e2302ba27d643907fa28c352f9
           persist-credentials: false
       - name: Pin verifier bytes outside candidate checkout
         shell: bash
         run: |
-          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="0b8e142de195cd752f3c35aaca35cacaf6d7d6add71a34d4cd3eab597c8c04a8" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
+          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="727948bdaa80a5a2f8b391673eb7ad01235dcae78d4de7481c80aae74fa4e156" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
       - name: Checkout candidate exact source HEAD
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -114,7 +114,7 @@ jobs:
       - run: cmake --build build --parallel 2
       - run: ctest --test-dir build --output-on-failure
   windows:
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 20
     steps:
       # Preserve raw Git blobs for both the SHA-256 pin and exact-byte guard.
@@ -127,12 +127,12 @@ jobs:
       - name: Checkout pinned verifier commit (same private repository)
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: 384ae50e3fa76caa02d7697b2d6934c9aa955a58
+          ref: 27f2c9aa6d67a7e2302ba27d643907fa28c352f9
           persist-credentials: false
       - name: Pin verifier bytes outside candidate checkout
         shell: pwsh
         run: |
-          python -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="0b8e142de195cd752f3c35aaca35cacaf6d7d6add71a34d4cd3eab597c8c04a8" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
+          python -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="727948bdaa80a5a2f8b391673eb7ad01235dcae78d4de7481c80aae74fa4e156" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
       - name: Checkout candidate exact source HEAD
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -167,12 +167,12 @@ jobs:
       - name: Checkout pinned verifier commit (same private repository)
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: 384ae50e3fa76caa02d7697b2d6934c9aa955a58
+          ref: 27f2c9aa6d67a7e2302ba27d643907fa28c352f9
           persist-credentials: false
       - name: Pin verifier bytes outside candidate checkout
         shell: bash
         run: |
-          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="0b8e142de195cd752f3c35aaca35cacaf6d7d6add71a34d4cd3eab597c8c04a8" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
+          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="727948bdaa80a5a2f8b391673eb7ad01235dcae78d4de7481c80aae74fa4e156" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
       - name: Checkout candidate exact source HEAD
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:

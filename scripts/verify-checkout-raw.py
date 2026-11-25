@@ -22,13 +22,15 @@ def git(*args):
     # Git environment overrides may replace the *real* index (GIT_INDEX_FILE),
     # redirect repository discovery (GIT_DIR/GIT_WORK_TREE), or create external
     # trace files (GIT_TRACE*). Never inherit any untrusted GIT_* state.
-    # Ignore user/system config too; the repository-local config remains usable,
-    # with core.fsmonitor forcibly disabled for every plumbing invocation.
+    # Ignore user/system config too. Override unsafe repository-local settings
+    # which can hide untracked case aliases or stale untracked-cache entries.
     env = {key: value for key, value in os.environ.items()
            if not key.upper().startswith('GIT_')}
     env['GIT_CONFIG_NOSYSTEM'] = '1'
     env['GIT_CONFIG_GLOBAL'] = os.devnull
-    return subprocess.run(['git', '-c', 'core.fsmonitor=false', '--no-optional-locks', *args], check=True,
+    return subprocess.run(['git', '-c', 'core.fsmonitor=false',
+                           '-c', 'core.ignorecase=false', '-c', 'core.untrackedCache=false',
+                           '--no-optional-locks', *args], check=True,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env).stdout
 
 
@@ -159,9 +161,15 @@ def open_tracked(raw_path, root_fd):
     from ctypes import wintypes
     if not hasattr(ctypes, 'WinDLL'):
         fail('Windows native no-follow API unavailable')
-    candidate = Path.cwd().joinpath(*[os.fsdecode(p) for p in parts])
+    # Canonicalize only the trusted checkout root (e.g. a Windows short-name
+    # alias for a runner temp directory), never an untrusted tracked child.
+    cwd = Path.cwd()
+    if cwd.lstat().st_file_attributes & REPARSE_POINT:
+        fail('Windows reparse point at checkout root')
+    root = cwd.resolve(strict=True)
+    candidate = root.joinpath(*[os.fsdecode(p) for p in parts])
     for parent in (candidate, *candidate.parents):
-        if parent == Path.cwd().parent:
+        if parent == root.parent:
             break
         st = parent.lstat()
         if st.st_file_attributes & REPARSE_POINT:

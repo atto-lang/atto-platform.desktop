@@ -161,9 +161,15 @@ def open_tracked(raw_path, root_fd):
     from ctypes import wintypes
     if not hasattr(ctypes, 'WinDLL'):
         fail('Windows native no-follow API unavailable')
-    candidate = Path.cwd().joinpath(*[os.fsdecode(p) for p in parts])
+    # Canonicalize only the trusted checkout root (e.g. a Windows short-name
+    # alias for a runner temp directory), never an untrusted tracked child.
+    cwd = Path.cwd()
+    if cwd.lstat().st_file_attributes & REPARSE_POINT:
+        fail('Windows reparse point at checkout root')
+    root = cwd.resolve(strict=True)
+    candidate = root.joinpath(*[os.fsdecode(p) for p in parts])
     for parent in (candidate, *candidate.parents):
-        if parent == Path.cwd().parent:
+        if parent == root.parent:
             break
         st = parent.lstat()
         if st.st_file_attributes & REPARSE_POINT:

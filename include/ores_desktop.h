@@ -2,6 +2,19 @@
 #define ORES_DESKTOP_H
 #include <stddef.h>
 #include <stdint.h>
+/* Explicit, minimal shared-library ABI: never export host-internal mailbox
+ * primitives. Static linking needs no annotation. */
+#if defined(ORES_DESKTOP_SHARED_BUILD)
+#  if defined(_WIN32)
+#    define ORES_DESKTOP_API __declspec(dllexport)
+#  elif defined(__GNUC__) || defined(__clang__)
+#    define ORES_DESKTOP_API __attribute__((visibility("default")))
+#  else
+#    error "Explicit exports required for this shared-library toolchain"
+#  endif
+#else
+#  define ORES_DESKTOP_API
+#endif
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -49,7 +62,7 @@ typedef struct {
     ores_desktop_status (*present)(void *);
     void (*close)(void *);
 } ores_desktop_backend;
-uint32_t ores_desktop_abi_version(void);
+ORES_DESKTOP_API uint32_t ores_desktop_abi_version(void);
 /* Pure validation of a single host/backend event; no callbacks or writes.
  * Resize x/y are dimensions in [0,16384] (zero means minimized). Other
  * coordinates are unconstrained signed 32-bit values. The host loop
@@ -61,7 +74,7 @@ ores_desktop_status ores_desktop_validate_event(const ores_desktop_event *event)
  * This is a host C ABI utility, not compiled-guest availability proof. */
 ores_desktop_status ores_desktop_validate_config(const ores_desktop_config *config);
 /* Single-threaded UI loop. Successful open always gets one close. */
-ores_desktop_status ores_desktop_run(const ores_desktop_config *,
+ORES_DESKTOP_API ores_desktop_status ores_desktop_run(const ores_desktop_config *,
                                     const ores_desktop_app *,
                                     const ores_desktop_backend *);
 /* Deterministic host-only defaults; returned title points to static immutable bytes. */

@@ -18,7 +18,9 @@ typedef struct {
 static ores_desktop_status opened(void *context, const ores_desktop_config *cfg) {
     state *s=(state *)context;
     CHECK(cfg->title!=s->original_title);
-    CHECK(strcmp(cfg->title,s->original_title)==0);
+    CHECK(cfg->title_length==strlen(s->original_title));
+    CHECK(memcmp(cfg->title,s->original_title,cfg->title_length)==0);
+    CHECK(cfg->title[cfg->title_length]=='\0');
     ++s->opens;
     return ORES_DESKTOP_OK;
 }
@@ -44,7 +46,7 @@ static void closed(void *context) { ++((state *)context)->closes; }
 
 static void assert_title(const char *title, int valid) {
     state s={0};
-    ores_desktop_config cfg={ORES_DESKTOP_ABI_VERSION,640,480,1,1,title};
+    ores_desktop_config cfg={ORES_DESKTOP_ABI_VERSION,640,480,1,1,title,strlen(title)};
     ores_desktop_app app={0};
     ores_desktop_backend backend={0};
     s.original_title=title;
@@ -87,14 +89,15 @@ int main(void) {
     assert_title("caf\xc3\xa9",1);
     assert_title("\xe2\x82\xac",1);
     assert_title("\xf0\x9f\x8c\x8d",1);
-    /* Scalar min/max edges: accept all legal RFC 3629 ranges. */
-    assert_title("\x7f",1);
-    assert_title("\xc2\x80",1);
+    /* Scalar edges: valid encodings still obey the title admission policy. */
+    assert_title("\x7f",0);
+    assert_title("\xc2\x80",0);
     assert_title("\xdf\xbf",1);
     assert_title("\xe0\xa0\x80",1);
     assert_title("\xed\x9f\xbf",1);
     assert_title("\xf0\x90\x80\x80",1);
-    assert_title("\xf4\x8f\xbf\xbf",1);
+    assert_title("\xf4\x8f\xbf\xbf",0);
+    assert_title("\xf4\x8f\xbf\xbd",1);
     assert_title("",0);
     memset(max_ascii,'A',127); max_ascii[127]='\0';
     assert_title(max_ascii,1);

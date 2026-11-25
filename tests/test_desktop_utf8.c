@@ -102,10 +102,10 @@ int main(void) {
     memset(max_ascii,'A',127); max_ascii[127]='\0';
     assert_title(max_ascii,1);
     memset(max_utf8,'A',125);
-    max_utf8[125]=(char)0xc3; max_utf8[126]=(char)0xa9; max_utf8[127]='\0';
+    memcpy(max_utf8+125,"\xc3\xa9",2); max_utf8[127]='\0';
     assert_title(max_utf8,1);
     memset(split_utf8,'A',126);
-    split_utf8[126]=(char)0xc3; split_utf8[127]='\0';
+    memcpy(split_utf8+126,"\xc3",1); split_utf8[127]='\0';
     assert_title(split_utf8,0);
     memset(too_long,'A',128); too_long[128]='\0';
     assert_title(too_long,0);

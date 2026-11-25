@@ -47,15 +47,15 @@ static ores_desktop_status expected(test_state *s) {
  return s->present_s==0 ? ORES_DESKTOP_OK : ORES_DESKTOP_BACKEND_ERROR;
 }
 static void run_one(test_state *s) {
- ores_desktop_config cfg={ORES_DESKTOP_ABI_VERSION,128,256,1,1,"matrix"};
+ ores_desktop_config cfg={ORES_DESKTOP_ABI_VERSION,128,256,1,1,"matrix",6};
  ores_desktop_app a={s,start_a,event_a,frame_a,stop_a};
  ores_desktop_backend b={s,open_b,poll_b,present_b,close_b};
  ores_desktop_status want=expected(s),got=ores_desktop_run(&cfg,&a,&b);
  if(got!=want){fprintf(stderr,"FAIL status open=%d start=%d poll=%d avail=%d eventtype=%d event=%d frame=%d present=%d got=%d expected=%d\n",s->open_s,s->start_s,s->poll_s,s->available,s->event_type,s->event_s,s->frame_s,s->present_s,(int)got,(int)want);exit(1);}
  CHECK(s->opens==1);
- CHECK(s->closes==(s->open_s==0));
- CHECK(s->starts==(s->open_s==0));
- CHECK(s->stops==(s->open_s==0 && s->start_s<=1));
+ CHECK(s->closes==(unsigned)(s->open_s==0));
+ CHECK(s->starts==(unsigned)(s->open_s==0));
+ CHECK(s->stops==(unsigned)(s->open_s==0 && s->start_s<=1));
  unsigned should_poll=(s->open_s==0 && s->start_s==0);
  CHECK(s->polls==should_poll);
  unsigned should_event=should_poll && s->poll_s==0 && s->available==1 && s->event_type<2;

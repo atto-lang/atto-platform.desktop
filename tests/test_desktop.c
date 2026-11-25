@@ -129,13 +129,17 @@ static void bad_arguments(void) {
     c.title="A\nB"; c.title_length=3;
     CHECK(ores_desktop_run(&c,&a,&b)==ORES_DESKTOP_INVALID_ARGUMENT);
     {
-        const char overlong[]={(char)0xc0,(char)0x80};
-        const char partial[]={(char)0xe2,(char)0x82};
-        const char surrogate[]={(char)0xed,(char)0xa0,(char)0x80};
-        const char too_high[]={(char)0xf4,(char)0x90,(char)0x80,(char)0x80};
-        const char stray[]={(char)0x80};
-        const char c1_control[]={(char)0xc2,(char)0x85};
-        const char *invalid[]={overlong,partial,surrogate,too_high,stray,c1_control};
+        /* Store raw UTF-8 octets without implementation-dependent signed char
+         * truncation. Interpret the bytes as char only at the title API. */
+        const unsigned char overlong[]={0xc0u,0x80u};
+        const unsigned char partial[]={0xe2u,0x82u};
+        const unsigned char surrogate[]={0xedu,0xa0u,0x80u};
+        const unsigned char too_high[]={0xf4u,0x90u,0x80u,0x80u};
+        const unsigned char stray[]={0x80u};
+        const unsigned char c1_control[]={0xc2u,0x85u};
+        const char *invalid[]={(const char *)overlong,(const char *)partial,
+            (const char *)surrogate,(const char *)too_high,
+            (const char *)stray,(const char *)c1_control};
         const size_t sizes[]={2u,2u,3u,4u,1u,2u};
         size_t i;
         for (i=0;i<sizeof(sizes)/sizeof(sizes[0]);++i) {
@@ -246,19 +250,91 @@ static void title_boundary_matrix(void) {
     raw[124]=0xe2; raw[125]=0x80; raw[126]=0xae;
     check_title_bytes((const char *)raw,sizeof raw,0);
     {
-        const unsigned char max_scalar[]={0xf4,0x8f,0xbf,0xbf};
+        const unsigned char max_noncharacter[]={0xf4,0x8f,0xbf,0xbf};
+        const unsigned char max_neighbor[]={0xf4,0x8f,0xbf,0xbd}; /* U+10FFFD, valid */
         const unsigned char beyond_max[]={0xf4,0x90,0x80,0x80};
         const unsigned char surrogate[]={0xed,0xbf,0xbf};
-        check_title_bytes((const char *)max_scalar,sizeof max_scalar,1);
+        check_title_bytes((const char *)max_noncharacter,sizeof max_noncharacter,0);
+        check_title_bytes((const char *)max_neighbor,sizeof max_neighbor,1);
         check_title_bytes((const char *)beyond_max,sizeof beyond_max,0);
         check_title_bytes((const char *)surrogate,sizeof surrogate,0);
     }
+}
+
+/* Issue #33: reject modifier/filler-only valid UTF-8 before ANY callback,
+ * without banning joiners, variation selectors, or international text when
+ * accompanied by a visible anchor. This intentionally does not change the
+ * previously admitted standalone U+00A0 compatibility case. */
+static void title_invisible_only_matrix(void) {
+    static const struct {
+        const char *bytes;
+        size_t length;
+    } invisible[] = {
+        {"\xe2\x80\x8c",3},       /* U+200C ZWNJ */
+        {"\xe2\x80\x8d",3},       /* U+200D ZWJ */
+        {"\xe3\x85\xa4",3},       /* U+3164 Hangul filler */
+        {"\xe1\x85\x9f",3},       /* U+115F Hangul choseong filler */
+        {"\xe1\x85\xa0",3},       /* U+1160 Hangul jungseong filler */
+        {"\xef\xbe\xa0",3},       /* U+FFA0 halfwidth Hangul filler */
+        {"\xef\xb8\x8f",3},       /* U+FE0F emoji variation selector */
+        {"\xef\xb8\x80",3},       /* U+FE00 variation selector */
+        {"\xf3\xa0\x84\x80",4},   /* U+E0100 supplementary VS */
+        {"\xf3\xa0\x81\xa1",4},   /* U+E0061 Unicode tag character */
+        {"\xe2\xa0\x80",3},       /* U+2800 blank braille cell */
+        {"\xe1\x9e\xb4",3},       /* U+17B4 Khmer invisible vowel */
+        {"\xe1\xa0\x8b",3},       /* U+180B Mongolian VS */
+        {"\xf0\x9b\xb2\xa0",4}    /* U+1BCA0 shorthand format */
+    };
+    unsigned char raw[127];
+    size_t i;
+    for (i=0;i<sizeof invisible/sizeof invisible[0];++i) {
+        check_title_bytes(invisible[i].bytes,invisible[i].length,0);
+    }
+    /* Reconcile #34's Unicode blank ranges with #35's modifier coverage.
+     * Reject standalone blank/format scalars before ANY callback. */
+    check_title_bytes("\xe2\x80\x80",3,0); /* U+2000 */
+    check_title_bytes("\xe2\x80\x83",3,0); /* U+2003 */
+    check_title_bytes("\xe2\x80\x8a",3,0); /* U+200A */
+    check_title_bytes("\xe2\x80\xaf",3,0); /* U+202F */
+    check_title_bytes("\xe2\x81\x9f",3,0); /* U+205F */
+    check_title_bytes("\xe3\x80\x80",3,0); /* U+3000 */
+    check_title_bytes("\xef\xbf\xb9",3,0); /* U+FFF9 */
+    check_title_bytes("\xf3\xa0\x82\x80",4,0); /* U+E0080 */
+    check_title_bytes("\xf0\x9d\x85\xb3",4,0); /* U+1D173 */
+    /* Existing ASCII-space/NBSP behavior and visible text remain stable. */
+    check_title_bytes(" ",1,1);
+    check_title_bytes("\xc2\xa0",2,1);
+    check_title_bytes("A\xe2\x80\x80",4,1);
+    check_title_bytes("A\xe2\x80\xaf",4,1);
+    check_title_bytes("A\xe3\x80\x80",4,1);
+    check_title_bytes("A\xef\xbf\xb9",4,1);
+    check_title_bytes("\xe2\x80\x8c\xef\xb8\x8f\xe3\x85\xa4",9,0);
+    check_title_bytes("\xe2\x80\x8d\xe2\x80\x8d",6,0);
+    check_title_bytes("\xef\xb8\x8f\xef\xb8\x8f",6,0);
+    check_title_bytes("\xe2\x80\x8d" "Atto",7,1);
+    check_title_bytes("Atto\xe2\x80\x8c",7,1);
+    check_title_bytes("\xd8\xa7\xe2\x80\x8c\xd9\x84",7,1); /* Arabic with ZWNJ */
+    check_title_bytes("\xe2\x9d\xa4\xef\xb8\x8f",6,1);     /* heart + VS16 */
+    check_title_bytes("\xf0\x9f\x91\xa9\xe2\x80\x8d\xf0\x9f\x92\xbb",11,1);
+    check_title_bytes("\xc2\xa0",2,1);                     /* existing U+00A0 */
+    /* Exact 127-byte non-NUL-terminated invisible-only string. */
+    for (i=0;i<123;i+=3) memcpy(raw+i,"\xef\xb8\x8f",3);
+    memcpy(raw+123,"\xf3\xa0\x81\xa1",4);
+    check_title_bytes((const char *)raw,sizeof raw,0);
+    /* Long string with one visible byte remains admissible. */
+    raw[0]='A';
+    for (i=1;i<sizeof raw;i+=3) memcpy(raw+i,"\xe2\x80\x8d",3);
+    check_title_bytes((const char *)raw,sizeof raw,1);
+    /* A broken final UTF-8 scalar is never rescued by an earlier anchor. */
+    raw[126]=0xe2;
+    check_title_bytes((const char *)raw,sizeof raw,0);
 }
 
 int main(void) {
     CHECK(ores_desktop_abi_version()==ORES_DESKTOP_ABI_VERSION);
     bad_arguments();
     title_boundary_matrix();
+    title_invisible_only_matrix();
     run_scenario(0,ORES_DESKTOP_OK,3,0,3,1,1);
     run_scenario(1,ORES_DESKTOP_OK,0,1,0,1,1);
     run_scenario(2,ORES_DESKTOP_OK,3,6,3,1,1);

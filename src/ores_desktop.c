@@ -1,23 +1,26 @@
 #include "ores_desktop.h"
 #include <stddef.h>
 uint32_t ores_desktop_abi_version(void) { return ORES_DESKTOP_ABI_VERSION; }
-/* This is a deliberately bounded invisible-scalar classifier, NOT a Unicode
- * renderer or complete Default_Ignorable_Code_Point implementation. The title
- * must contain a non-ignorable scalar, while ZWNJ/ZWJ/VS remain valid inside
- * visible Arabic/Persian/emoji sequences. Preserve existing U+00A0 behavior. */
-static int title_format_only(unsigned int scalar) {
-    /* Unicode whitespace rendering can leave a title blank even when
-     * its scalar is not Default_Ignorable. Preserve legacy U+00A0. */
+/* Deliberately bounded, host-ABI-only visible-anchor policy: these scalars
+ * cannot make an otherwise empty title visible by themselves. They remain
+ * legal inside a title containing other text (e.g. ZWNJ in Persian, VS16
+ * after emoji, ZWJ emoji sequences). This is not a Unicode render/shaping
+ * engine or a complete Unicode Default_Ignorable_Code_Point table.
+ * Preserve the existing U+00A0 compatibility behavior. */
+static int title_only_modifier(unsigned int scalar) {
+    /* Union of the fail-closed #34 Unicode blank/format coverage and #35's
+     * broader modifier coverage. Neither is a Unicode rendering oracle. */
     return (scalar>=0x2000u && scalar<=0x200au) ||
+           scalar==0x1680u || /* Ogham space mark: blank without anchor */
            scalar==0x202fu || scalar==0x205fu || scalar==0x2800u ||
            scalar==0x3000u ||
            (scalar>=0x115fu && scalar<=0x1160u) ||
            (scalar>=0x17b4u && scalar<=0x17b5u) ||
            (scalar>=0x180bu && scalar<=0x180du) || scalar==0x180fu ||
            (scalar>=0x200cu && scalar<=0x200du) ||
-           scalar==0x3164u ||
+           scalar==0x3164u || scalar==0xffa0u ||
            (scalar>=0xfe00u && scalar<=0xfe0fu) ||
-           scalar==0xffa0u ||
+           (scalar>=0xfff9u && scalar<=0xfffbu) ||
            (scalar>=0x1bca0u && scalar<=0x1bca3u) ||
            (scalar>=0x1d173u && scalar<=0x1d17au) ||
            (scalar>=0xe0000u && scalar<=0xe0fffu) ||
@@ -26,13 +29,12 @@ static int title_format_only(unsigned int scalar) {
 /* SDL3 window titles must be complete UTF-8 scalar strings. */
 static int valid_utf8_title(const char *s, size_t length) {
     size_t i=0;
-    int has_non_ignorable=0;
+    int has_visible_anchor=0;
     while (i<length) {
         unsigned char c=(unsigned char)s[i];
         size_t extra, j;
         if (c<0x20 || c==0x7f) return 0;
-        /* ASCII space is intentionally preserved by the existing title ABI. */
-        if (c<0x80) { has_non_ignorable=1; ++i; continue; }
+        if (c<0x80) { has_visible_anchor=1; ++i; continue; }
         if (c>=0xc2 && c<=0xdf) extra=1;
         else if (c>=0xe0 && c<=0xef) extra=2;
         else if (c>=0xf0 && c<=0xf4) extra=3;
@@ -57,24 +59,28 @@ static int valid_utf8_title(const char *s, size_t length) {
             for (j=1;j<=extra;++j) {
                 scalar=(scalar<<6) | ((unsigned char)s[i+j] & 0x3fu);
             }
+            /* Unicode noncharacters are legal scalar encodings, but never
+             * meaningful window-title anchors. Deny them even when mixed
+             * with visible text, in every Unicode plane. */
+            if ((scalar>=0xfdd0u && scalar<=0xfdefu) ||
+                (scalar & 0xffffu)>=0xfffeu) return 0;
             if (scalar==0x00adu || scalar==0x034fu || scalar==0x061cu ||
                 scalar==0x180eu || scalar==0x200bu ||
                 scalar==0x200eu || scalar==0x200fu ||
                 (scalar>=0x2028u && scalar<=0x202eu) ||
                 (scalar>=0x2060u && scalar<=0x206fu) ||
                 scalar==0xfeffu) return 0;
-            if (!title_format_only(scalar)) has_non_ignorable=1;
+            if (!title_only_modifier(scalar)) has_visible_anchor=1;
         }
         i+=extra+1;
     }
-    return has_non_ignorable;
+    return has_visible_anchor;
 }
 static int snapshot_title(const char *source, size_t length, char destination[128]) {
     size_t i;
     if (!source || length == 0 || length > 127) return 0;
-    /* Validate the immutable local copy: never validate caller bytes and
-     * then hand different bytes to the backend. Callers must still keep the
-     * borrowed source readable/stable during this call. */
+    /* Copy first and validate the actual bytes supplied to backend.open.
+     * A caller must keep borrowed source bytes readable for this call. */
     for (i=0; i<length; ++i) {
         destination[i]=source[i];
     }
@@ -83,6 +89,32 @@ static int snapshot_title(const char *source, size_t length, char destination[12
 }
 static int valid_status(ores_desktop_status s) {
     return s==ORES_DESKTOP_OK || s==ORES_DESKTOP_STOP;
+}
+ores_desktop_status ores_desktop_validate_event(const ores_desktop_event *event) {
+    if (!event || event->type < ORES_DESKTOP_QUIT ||
+        event->type > ORES_DESKTOP_POINTER_UP)
+        return ORES_DESKTOP_INVALID_ARGUMENT;
+    if (event->type == ORES_DESKTOP_RESIZE &&
+        (event->x < 0 || event->y < 0 ||
+         event->x > 16384 || event->y > 16384))
+        return ORES_DESKTOP_INVALID_ARGUMENT;
+    return ORES_DESKTOP_OK;
+}
+
+static int snapshot_valid_config(const ores_desktop_config *cfg, char title[128]) {
+    return cfg->abi_version==ORES_DESKTOP_ABI_VERSION &&
+           cfg->width>0 && cfg->width<=16384 &&
+           cfg->height>0 && cfg->height<=16384 &&
+           cfg->max_events_per_frame>0 && cfg->max_events_per_frame<=256 &&
+           snapshot_title(cfg->title,cfg->title_length,title);
+}
+ores_desktop_status ores_desktop_validate_config(const ores_desktop_config *config) {
+    ores_desktop_config snapshot;
+    char title[128];
+    if (!config) return ORES_DESKTOP_INVALID_ARGUMENT;
+    snapshot=*config;
+    return snapshot_valid_config(&snapshot,title)
+        ? ORES_DESKTOP_OK : ORES_DESKTOP_INVALID_ARGUMENT;
 }
 ores_desktop_status ores_desktop_run(const ores_desktop_config *c,
                                      const ores_desktop_app *a,
@@ -104,10 +136,7 @@ ores_desktop_status ores_desktop_run(const ores_desktop_config *c,
     cfg=*c;
     app=*a;
     backend=*b;
-    if (cfg.abi_version!=ORES_DESKTOP_ABI_VERSION ||
-        !cfg.width || cfg.width>16384 || !cfg.height || cfg.height>16384 ||
-        !cfg.max_events_per_frame || cfg.max_events_per_frame>256 ||
-        !snapshot_title(cfg.title,cfg.title_length,title) ||
+    if (!snapshot_valid_config(&cfg,title) ||
         (!app.on_start && !app.on_event && !app.on_frame) ||
         !backend.open || !backend.poll || !backend.present || !backend.close)
         return ORES_DESKTOP_INVALID_ARGUMENT;
@@ -134,7 +163,7 @@ ores_desktop_status ores_desktop_run(const ores_desktop_config *c,
                 outcome=ORES_DESKTOP_BACKEND_ERROR; goto cleanup;
             }
             if (!available) break;
-            if (e.type<ORES_DESKTOP_QUIT || e.type>ORES_DESKTOP_POINTER_UP) {
+            if (ores_desktop_validate_event(&e) != ORES_DESKTOP_OK) {
                 outcome=ORES_DESKTOP_BACKEND_ERROR; goto cleanup;
             }
             /* Do not let a callback's cast-away-const write change whether
@@ -163,4 +192,17 @@ cleanup:
     if (started && app.on_stop) app.on_stop(app.context);
     backend.close(backend.context);
     return outcome;
+}
+
+ores_desktop_config ores_desktop_default_config(void) {
+    static const char title[] = "Oreslang";
+    ores_desktop_config config = {0};
+    config.abi_version = ORES_DESKTOP_ABI_VERSION;
+    config.width = 800u;
+    config.height = 600u;
+    config.max_events_per_frame = 64u;
+    config.frame_limit = 0u;
+    config.title = title;
+    config.title_length = sizeof(title) - 1u;
+    return config;
 }

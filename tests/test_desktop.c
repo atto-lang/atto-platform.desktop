@@ -129,13 +129,17 @@ static void bad_arguments(void) {
     c.title="A\nB"; c.title_length=3;
     CHECK(ores_desktop_run(&c,&a,&b)==ORES_DESKTOP_INVALID_ARGUMENT);
     {
-        const char overlong[]={(char)0xc0,(char)0x80};
-        const char partial[]={(char)0xe2,(char)0x82};
-        const char surrogate[]={(char)0xed,(char)0xa0,(char)0x80};
-        const char too_high[]={(char)0xf4,(char)0x90,(char)0x80,(char)0x80};
-        const char stray[]={(char)0x80};
-        const char c1_control[]={(char)0xc2,(char)0x85};
-        const char *invalid[]={overlong,partial,surrogate,too_high,stray,c1_control};
+        /* Store raw UTF-8 octets without implementation-dependent signed char
+         * truncation. Interpret the bytes as char only at the title API. */
+        const unsigned char overlong[]={0xc0u,0x80u};
+        const unsigned char partial[]={0xe2u,0x82u};
+        const unsigned char surrogate[]={0xedu,0xa0u,0x80u};
+        const unsigned char too_high[]={0xf4u,0x90u,0x80u,0x80u};
+        const unsigned char stray[]={0x80u};
+        const unsigned char c1_control[]={0xc2u,0x85u};
+        const char *invalid[]={(const char *)overlong,(const char *)partial,
+            (const char *)surrogate,(const char *)too_high,
+            (const char *)stray,(const char *)c1_control};
         const size_t sizes[]={2u,2u,3u,4u,1u,2u};
         size_t i;
         for (i=0;i<sizeof(sizes)/sizeof(sizes[0]);++i) {

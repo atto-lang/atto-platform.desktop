@@ -1,0 +1,12 @@
+{
+  "schema": "atto.repository-capabilities.v1",
+  "repository": "atto-lang/atto-platform.desktop",
+  "role": "platform",
+  "source_state": "implementation",
+  "feature_status": {
+    "target_profile": "not_executed",
+    "guest_execution": "not_executed"
+  },
+  "certification": "NOT_CERTIFIED",
+  "evidence": []
+}

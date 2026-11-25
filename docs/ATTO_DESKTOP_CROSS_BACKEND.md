@@ -8,7 +8,7 @@
 - **.NET NativeAOT:** compile AttoLang logic through the .NET backend. A thin C# generated P/Invoke layer is an **interop prototype**, not a substitute for guest-source ABI lowering. It can host app startup, but `interop/dotnet` currently proves only the synchronous headless C callback lifecycle.
 - **Java/GraalVM Native Image:** compile the Java-backed AttoLang runtime with Native Image. The JDK 25 FFM bridge in `interop/graalvm` demonstrates downcalls and upcalls from a host-side Java program. Real guest imports/exports, native-image reachability registration and AOT binary execution must be separately admitted.
 
-All three must resolve the **same** stable host interface; do not fork UI semantics by toolchain. The SDL3 window/input backend is opt-in and remains separate from the compiler. Select a renderer/UI adapter as a deployment choice: SDL3 for window/input/rendering primitives, or a future accessibility-capable native-widget / WebView adapter. SDL3 is not a full desktop widget toolkit.
+All three must resolve the **same** stable host interface; do not fork UI semantics by toolchain. The SDL3 window/input backend is opt-in and remains separate from the compiler. Select a renderer/UI adapter as a deployment choice: SDL3 for window/input/rendering primitives, or a future accessibility-capable native-widget adapter. SDL3 is not a full desktop widget toolkit.
 
 ## Build the library and run host-only FFI checks
 
@@ -18,7 +18,7 @@ cmake --build build-interop --config Release
 ctest --test-dir build-interop -C Release --output-on-failure
 ```
 
-The opt-in shared library is `libores_desktop.so` (Linux), `libores_desktop.dylib` (macOS) or `ores_desktop.dll` (Windows). This adds a dynamic linking option without changing the existing static target or host v1 ABI. On Windows, CMake exports the public C symbols. Build for each target OS/architecture: do not attempt to reuse binaries across platforms.
+The opt-in shared library is `libores_desktop.so` (Linux), `libores_desktop.dylib` (macOS) or `ores_desktop.dll` (Windows). This adds a dynamic linking option without changing the existing static target or host v2 ABI. On Windows, CMake exports the public C symbols. Build for each target OS/architecture: do not attempt to reuse binaries across platforms.
 
 With .NET SDK 10 and the library in the native loader search path, run:
 
@@ -36,7 +36,7 @@ java --enable-native-access=ALL-UNNAMED -cp build-interop/ffm DesktopInteropProb
 
 A GraalVM 25 Native Image build requires its FFM upcall/downcall metadata admission (including build-time registration of function descriptors and upcall targets), platform-specific native-link tests and a **run of the actual image**, not just HotSpot Java execution. It must fail closed on missing metadata or unsupported targets. GraalVM 25 documents FFM support on Windows x64, Linux x64/arm64 and macOS arm64; do not assume macOS x64 Native Image upcalls work.
 
-The probes validate host layout (64-bit only), ABI version mismatch rejection, callback/status semantics, correct stop/close counts and native interop. They do **not** open SDL windows, load AttoLang guest classes, prove actor isolation or prove NativeAOT/Native Image deployment. Current host v1 uses a borrowed NUL-terminated title; title ABI v2 and UTF-8 hardening are separate draft PRs and must be rebased semantically before merging.
+The probes validate host layout (64-bit only), ABI version mismatch rejection, callback/status semantics, correct stop/close counts and native interop. They do **not** open SDL windows, load AttoLang guest classes, prove actor isolation or prove NativeAOT/Native Image deployment. The canonical host ABI v2 uses a borrowed length-exact UTF-8 span (native size_t, 1–127 bytes); the host validates and snapshots the span before callbacks. ABI v1 callers are rejected. The merged scalar LLVM callback smoke remains the canonical .atto proof.
 
 ## Additive host-only SPSC and genuine native-image gates
 

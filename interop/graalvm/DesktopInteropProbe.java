@@ -19,21 +19,24 @@ public final class DesktopInteropProbe {
     private static final ValueLayout.OfLong I64 = ValueLayout.JAVA_LONG;
     private static final AddressLayout PTR = ValueLayout.ADDRESS;
     private static final MemoryLayout CONFIG = MemoryLayout.structLayout(
-            I32, I32, I32, I32, I64, PTR);
+            I32, I32, I32, I32, I64, PTR, I64);
     private static final MemoryLayout APP = MemoryLayout.structLayout(PTR, PTR, PTR, PTR, PTR);
     private static final MemoryLayout BACKEND = MemoryLayout.structLayout(PTR, PTR, PTR, PTR, PTR);
     private static int opens, starts, frames, polls, presents, stops, closes;
 
     private static int onStart(MemorySegment context) { starts++; return 0; }
     private static int onFrame(MemorySegment context, long number) {
-        if (number != frames) return 4;
+        if (number != frames % 2) return 4;
         frames++;
         return number == 1 ? 1 : 0;
     }
     private static void onStop(MemorySegment context) { stops++; }
     private static int open(MemorySegment context, MemorySegment config) {
         MemorySegment view = config.reinterpret(CONFIG.byteSize());
-        if (view.get(I32, 0) != 1 || view.get(I32, 4) != 800 || view.get(I32, 8) != 500)
+        if (view.get(I32, 0) != 2 || view.get(I32, 4) != 800 || view.get(I32, 8) != 500)
+            return 3;
+        long length = view.get(I64, 32);
+        if (length < 1 || length > 127 || view.get(PTR, 24).reinterpret(length + 1).get(ValueLayout.JAVA_BYTE, length) != 0)
             return 3;
         opens++;
         return 0;
@@ -59,7 +62,7 @@ public final class DesktopInteropProbe {
 
     public static void main(String[] args) throws Throwable {
         check(args.length == 1, "Usage: DesktopInteropProbe /absolute/path/to/libores_desktop");
-        check(PTR.byteSize() == 8 && CONFIG.byteSize() == 32 &&
+        check(PTR.byteSize() == 8 && CONFIG.byteSize() == 40 &&
               APP.byteSize() == 40 && BACKEND.byteSize() == 40,
               "Unsupported host pointer width / C ABI layout");
         try (Arena arena = Arena.ofConfined()) {
@@ -67,18 +70,17 @@ public final class DesktopInteropProbe {
             MethodHandle version = LINKER.downcallHandle(
                     library.find("ores_desktop_abi_version").orElseThrow(),
                     FunctionDescriptor.of(I32));
-            check((int) version.invokeExact() == 1, "Unsupported desktop ABI version");
+            check((int) version.invokeExact() == 2, "Unsupported desktop ABI version");
             MethodHandle run = LINKER.downcallHandle(
                     library.find("ores_desktop_run").orElseThrow(),
                     FunctionDescriptor.of(I32, PTR, PTR, PTR));
-            MethodHandle runV2 = LINKER.downcallHandle(
-                    library.find("ores_desktop_run_v2").orElseThrow(),
-                    FunctionDescriptor.of(I32, PTR, PTR, PTR));
 
             MemorySegment cfg = arena.allocate(CONFIG);
-            cfg.set(I32, 0, 1); cfg.set(I32, 4, 800); cfg.set(I32, 8, 500);
+            cfg.set(I32, 0, 2); cfg.set(I32, 4, 800); cfg.set(I32, 8, 500);
             cfg.set(I32, 12, 8); cfg.set(I64, 16, 4);
-            cfg.set(PTR, 24, arena.allocateFrom("AttoLang GraalVM desktop interop"));
+            String title = "AttoLang GraalVM desktop interop";
+            cfg.set(PTR, 24, arena.allocateFrom(title));
+            cfg.set(I64, 32, title.getBytes(java.nio.charset.StandardCharsets.UTF_8).length);
             MemorySegment app = arena.allocate(APP);
             app.set(PTR, 8, upcall("onStart", MethodType.methodType(int.class, MemorySegment.class),
                     FunctionDescriptor.of(I32, PTR), arena));
@@ -99,7 +101,7 @@ public final class DesktopInteropProbe {
             cfg.set(I32, 0, 99);
             check((int) run.invokeExact(cfg, app, backend) == 2 && opens == 0,
                     "Unsupported ABI version must fail closed");
-            cfg.set(I32, 0, 1);
+            cfg.set(I32, 0, 2);
             check((int) run.invokeExact(cfg, app, backend) == 0, "Host run failed");
             check(opens == 1 && starts == 1 && frames == 2 && presents == 1 &&
                   stops == 1 && closes == 1 && polls == 2, "Lifecycle callback mismatch");
@@ -110,23 +112,23 @@ public final class DesktopInteropProbe {
             v2.set(I32, 12, 8); v2.set(I64, 16, 4);
             MemorySegment exact = arena.allocate(127, 1);
             for (int i = 0; i < 127; ++i) exact.set(ValueLayout.JAVA_BYTE, i, (byte)'X');
-            v2.set(PTR, 24, exact); v2.set(I32, 32, 127);
+            v2.set(PTR, 24, exact); v2.set(I64, 32, 127);
             v2.set(I32, 0, 1);
-            check((int) runV2.invokeExact(v2, app, backend) == 2 && opens == 1,
+            check((int) run.invokeExact(v2, app, backend) == 2 && opens == 1,
                   "v2 wrong version must reject without callbacks");
             v2.set(I32, 0, 2);
             MemorySegment invalid = arena.allocate(2, 1);
             invalid.set(ValueLayout.JAVA_BYTE, 0, (byte)0xc0);
             invalid.set(ValueLayout.JAVA_BYTE, 1, (byte)0xaf);
-            v2.set(PTR, 24, invalid); v2.set(I32, 32, 2);
-            check((int) runV2.invokeExact(v2, app, backend) == 2 && opens == 1,
+            v2.set(PTR, 24, invalid); v2.set(I64, 32, 2);
+            check((int) run.invokeExact(v2, app, backend) == 2 && opens == 1,
                   "malformed UTF-8 must reject without callbacks");
-            v2.set(PTR, 24, exact); v2.set(I32, 32, 127);
-            check((int) runV2.invokeExact(v2, app, backend) == 0, "v2 host run failed");
+            v2.set(PTR, 24, exact); v2.set(I64, 32, 127);
+            check((int) run.invokeExact(v2, app, backend) == 0, "v2 host run failed");
             check(opens == 2 && starts == 2 && frames == 4 &&
                   presents == 2 && stops == 2 && closes == 2 && polls == 4,
                   "v2 lifecycle callback mismatch");
-            System.out.println("GraalVM/Java FFM host ABI v1/v2: PASS (headless, not an Atto guest test)");
+            System.out.println("GraalVM/Java FFM host ABI v2: PASS (headless, not an Atto guest test)");
         }
     }
 }

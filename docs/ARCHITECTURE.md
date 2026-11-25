@@ -4,11 +4,11 @@
 
 The LLVM compiler should produce native machine code for a verified Oreslang program. The desktop repository owns the platform adapter and its capabilities, not a second Oreslang compiler. Host C functions can be linked with ordinary scalar LLVM exports today (see LLVM linkage smoke), but guest-source host imports/callback trampolines are not yet admitted by the compiler.
 
-## C ABI v1 (bootstrap, not long-term stable)
+## C ABI v2 (bootstrap, not long-term stable)
 
 include/ores_desktop.h provides a process-local C11 API. All ABI aggregate layouts are native-host layouts, *not* a versioned wire representation. Callbacks are synchronous and only borrow event/config data for the duration of invocation. Events contain no pointers, dynamically allocated strings or OS-owned handles. Key codes are SDL physical scancodes when using SDL3; these are not text or portable business identifiers.
 
-A config must specify version 1, nonzero dimensions up to 16384, nonempty NUL-terminated title up to 127 bytes and max_events_per_frame in 1..256. The caller owns all pointed-to config/app/backend memory through ores_desktop_run. The pointer contract assumes caller-supplied valid C memory; it is **not** a hostile foreign pointer validation layer.
+A config must specify version 2, nonzero dimensions up to 16384, an explicit `title` + `title_length` pair of 1..127 bytes with well-formed UTF-8 and no embedded NUL, and max_events_per_frame in 1..256. The source title does not need a terminator; the host snapshots exactly `title_length` bytes and appends its own NUL before calling a backend. Invalid UTF-8, C0/C1 controls, prohibited formatting controls, noncharacters and titles containing only the bounded set of invisible modifiers are rejected before callbacks. The caller owns all pointed-to config/app/backend memory through ores_desktop_run. The pointer contract assumes caller-supplied valid C memory; it is **not** a hostile foreign pointer validation layer.
 
 The host runs on a single UI thread, validates event types, bounds event processing per frame and yields to on_frame before the next polling round. The backend's present method must pace an unlimited app; SDL3 waits 16 ms. This is a simple cadence, not high-resolution rendering or a fairness guarantee under blocking callbacks.
 

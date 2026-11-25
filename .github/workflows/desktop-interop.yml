@@ -30,17 +30,28 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # Immutable *content* pin, not an independent trust root until reviewed/protected.
+      - name: Checkout pinned verifier commit (same private repository)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 27f2c9aa6d67a7e2302ba27d643907fa28c352f9
+          persist-credentials: false
+      - name: Pin verifier bytes outside candidate checkout
+        shell: bash
+        run: |
+          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="727948bdaa80a5a2f8b391673eb7ad01235dcae78d4de7481c80aae74fa4e156" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
+      - name: Checkout candidate exact source HEAD
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - name: Verify exact source commit
+      - name: Verify exact source head
+        shell: bash
         env:
-          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          test "$(git rev-parse HEAD)" = "$EXPECTED"
-          test -z "$(git status --porcelain --untracked-files=all)"
-          git rev-parse "HEAD^{tree}"
+          set -euo pipefail
+          python3 -I "$RUNNER_TEMP/ores-desktop-pinned-verifier.py"
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
           dotnet-version: '10.0.x'
@@ -55,17 +66,28 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # Immutable *content* pin, not an independent trust root until reviewed/protected.
+      - name: Checkout pinned verifier commit (same private repository)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 27f2c9aa6d67a7e2302ba27d643907fa28c352f9
+          persist-credentials: false
+      - name: Pin verifier bytes outside candidate checkout
+        shell: bash
+        run: |
+          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="727948bdaa80a5a2f8b391673eb7ad01235dcae78d4de7481c80aae74fa4e156" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
+      - name: Checkout candidate exact source HEAD
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - name: Verify exact source commit
+      - name: Verify exact source head
+        shell: bash
         env:
-          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          test "$(git rev-parse HEAD)" = "$EXPECTED"
-          test -z "$(git status --porcelain --untracked-files=all)"
-          git rev-parse "HEAD^{tree}"
+          set -euo pipefail
+          python3 -I "$RUNNER_TEMP/ores-desktop-pinned-verifier.py"
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
           dotnet-version: '10.0.x'
@@ -83,21 +105,37 @@ jobs:
           file build-interop/dotnet-native/AttoDesktopInterop
           ./build-interop/dotnet-native/AttoDesktopInterop
   dotnet-windows:
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # Preserve raw Git blobs for both the SHA-256 pin and exact-byte guard.
+      - name: Disable Windows Git newline rewriting before checkout
+        shell: pwsh
+        run: |
+          git config --global core.autocrlf false
+          if ($LASTEXITCODE -ne 0) { throw "cannot configure byte-exact Git checkout" }
+      # Immutable *content* pin, not an independent trust root until reviewed/protected.
+      - name: Checkout pinned verifier commit (same private repository)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 27f2c9aa6d67a7e2302ba27d643907fa28c352f9
+          persist-credentials: false
+      - name: Pin verifier bytes outside candidate checkout
+        shell: pwsh
+        run: |
+          python -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="727948bdaa80a5a2f8b391673eb7ad01235dcae78d4de7481c80aae74fa4e156" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
+      - name: Checkout candidate exact source HEAD
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - name: Verify exact source commit
+      - name: Verify exact source head
         shell: pwsh
         env:
-          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          if ((git rev-parse HEAD).Trim() -cne $env:EXPECTED) { throw "wrong commit" }
-          if ((git status --porcelain --untracked-files=all | Out-String).Trim().Length -ne 0) { throw "dirty source" }
-          git rev-parse "HEAD^{tree}"
+          python -I "$env:RUNNER_TEMP/ores-desktop-pinned-verifier.py"
+          if ($LASTEXITCODE -ne 0) { throw "raw checkout source verification failed" }
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
           dotnet-version: '10.0.x'
@@ -116,17 +154,28 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # Immutable *content* pin, not an independent trust root until reviewed/protected.
+      - name: Checkout pinned verifier commit (same private repository)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 27f2c9aa6d67a7e2302ba27d643907fa28c352f9
+          persist-credentials: false
+      - name: Pin verifier bytes outside candidate checkout
+        shell: bash
+        run: |
+          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="727948bdaa80a5a2f8b391673eb7ad01235dcae78d4de7481c80aae74fa4e156" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
+      - name: Checkout candidate exact source HEAD
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - name: Verify exact source commit
+      - name: Verify exact source head
+        shell: bash
         env:
-          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          test "$(git rev-parse HEAD)" = "$EXPECTED"
-          test -z "$(git status --porcelain --untracked-files=all)"
-          git rev-parse "HEAD^{tree}"
+          set -euo pipefail
+          python3 -I "$RUNNER_TEMP/ores-desktop-pinned-verifier.py"
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
           dotnet-version: '10.0.x'
@@ -141,17 +190,28 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # Immutable *content* pin, not an independent trust root until reviewed/protected.
+      - name: Checkout pinned verifier commit (same private repository)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 27f2c9aa6d67a7e2302ba27d643907fa28c352f9
+          persist-credentials: false
+      - name: Pin verifier bytes outside candidate checkout
+        shell: bash
+        run: |
+          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="727948bdaa80a5a2f8b391673eb7ad01235dcae78d4de7481c80aae74fa4e156" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
+      - name: Checkout candidate exact source HEAD
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - name: Verify exact source commit
+      - name: Verify exact source head
+        shell: bash
         env:
-          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          test "$(git rev-parse HEAD)" = "$EXPECTED"
-          test -z "$(git status --porcelain --untracked-files=all)"
-          git rev-parse "HEAD^{tree}"
+          set -euo pipefail
+          python3 -I "$RUNNER_TEMP/ores-desktop-pinned-verifier.py"
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
           distribution: graalvm
@@ -175,17 +235,28 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # Immutable *content* pin, not an independent trust root until reviewed/protected.
+      - name: Checkout pinned verifier commit (same private repository)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 27f2c9aa6d67a7e2302ba27d643907fa28c352f9
+          persist-credentials: false
+      - name: Pin verifier bytes outside candidate checkout
+        shell: bash
+        run: |
+          python3 -I -c 'import hashlib,os,pathlib,sys; raw=pathlib.Path("scripts/verify-checkout-raw.py").read_bytes(); digest=hashlib.sha256(raw).hexdigest(); digest=="727948bdaa80a5a2f8b391673eb7ad01235dcae78d4de7481c80aae74fa4e156" or sys.exit("PINNED_VERIFIER_REJECTED: SHA256 mismatch"); pathlib.Path(os.environ["RUNNER_TEMP"],"ores-desktop-pinned-verifier.py").write_bytes(raw)'
+      - name: Checkout candidate exact source HEAD
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - name: Verify exact source commit
+      - name: Verify exact source head
+        shell: bash
         env:
-          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          test "$(git rev-parse HEAD)" = "$EXPECTED"
-          test -z "$(git status --porcelain --untracked-files=all)"
-          git rev-parse "HEAD^{tree}"
+          set -euo pipefail
+          python3 -I "$RUNNER_TEMP/ores-desktop-pinned-verifier.py"
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
           distribution: graalvm

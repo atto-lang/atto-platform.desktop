@@ -29,12 +29,12 @@ A window reference is a tuple `(tenant, app, window_id, window_generation)` with
 
 - A **C host-side SPSC UI command mailbox**: fixed capacity 64, zero allocation per message, one producer and one UI consumer, immutable actor generation, bounded message copying, terminal close, and explicit FULL/EMPTY/CLOSED/STALE results. The mailbox is a C host-internal struct and is not a stable .NET/FFM public memory layout. A UI dispatcher must still perform tenant/capability/window-generation checks.
 - The static and shared desktop host targets compile it. Linux adds a threaded 50k-FIFO CTest and all host build platforms add deterministic queue boundary tests.
-- A portable scalar `.ores` admission fixture (`fixtures/desktop_scalar_contract.ores`) exercises only a minimal language subset; it is **not** a guest-side UI API or native desktop application.
+- A portable scalar `.atto` admission fixture (`fixtures/desktop_scalar_contract.atto`) exercises only a minimal language subset; it is **not** a guest-side UI API or native desktop application.
 - .NET NativeAOT and GraalVM Native Image host-interop build-and-execution CI gates are authored separately from the JVM/managed probes. They are not verified until the exact PR head executes real steps.
 
 ## Compiler implementation contracts / smallest lowering
 
-**LLVM:** typed `.ores` external-import declaration -> type/effect/borrow checker -> MIR foreign call operation -> AOT lowering with named C symbol and exact v1/v2 ABI layout -> native object link -> dispatcher command result. Callback ingress must be a runtime-owned trampoline that only copies messages; do not pass a guest closure through C event callbacks.
+**LLVM:** typed `.ores` external-import declaration -> type/effect/borrow checker -> MIR foreign call operation -> AOT lowering with named C symbol and exact ABI v2 layout -> native object link -> dispatcher command result. Callback ingress must be a runtime-owned trampoline that only copies messages; do not pass a guest closure through C event callbacks.
 
 **.NET NativeAOT:** verified guest import -> pre-generated/static CIL P/Invoke stub -> NativeAOT publish -> bounded host call. Use explicit native structs and caller-owned lifetimes. Never emit Reflection.Emit, runtime assembly loading, unrestricted marshaling or a JIT fallback. Generated `main()` remains a scalar subset today.
 
@@ -42,7 +42,7 @@ A window reference is a tuple `(tenant, app, window_id, window_generation)` with
 
 ## Required executable parity receipts
 
-- Three backend compilers independently accept the **same** full desktop `.ores` fixture. Record each source blob/tree SHA, compiler tree SHA, exact toolchain version and produced binary's hash.
+- Three backend compilers independently accept the **same** full desktop `.atto` fixture. Record each source blob/tree SHA, compiler tree SHA, exact toolchain version and produced binary's hash.
 - An actual window opens, processes two copied input events, performs a redraw, and closes exactly once; no GTK/Qt/Avalonia/SDL backend-specific semantics leak into the guest result. Test real multiwindow filtering separately.
 - Negative tests: unsupported ABI, malformed UTF-8, forged/stale window capability, foreign window events, denied clipboard/file access, UI call from wrong thread, mailbox full, late message after close, actor shutdown, guest callback trap, lost wakeup.
 - Native executables: LLVM linked binary; `dotnet publish -p:PublishAot=true` with executed output; `native-image --no-fallback` with executed output. A JDK HotSpot or .NET managed JIT smoke is never promoted into an AOT receipt.

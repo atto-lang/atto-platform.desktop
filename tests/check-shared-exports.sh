@@ -7,7 +7,7 @@ nm_tool=$1
 library=$2
 [ -f "$library" ] || { echo "missing shared object: $library" >&2; exit 2; }
 actual=$("$nm_tool" -D -g --defined-only "$library" | awk '{ print $NF }' | LC_ALL=C sort -u)
-expected=$(printf '%s\n' ores_desktop_abi_version ores_desktop_run ores_desktop_run_v2 | LC_ALL=C sort -u)
+expected=$(printf '%s\n' ores_desktop_abi_version ores_desktop_run | LC_ALL=C sort -u)
 if [ "$actual" != "$expected" ]; then
     printf 'UNEXPECTED_DESKTOP_SHARED_EXPORTS\nexpected:\n%s\nactual:\n%s\n' "$expected" "$actual" >&2
     exit 1

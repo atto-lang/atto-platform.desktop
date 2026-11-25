@@ -14,8 +14,8 @@ import unittest
 
 SOURCE = Path(__file__).with_name("verify-checkout-raw.py")
 WORKFLOW = Path(__file__).resolve().parent.parent / ".github" / "workflows" / "ci.yml"
-PIN_COMMIT = "384ae50e3fa76caa02d7697b2d6934c9aa955a58"
-PIN_SHA256 = "0b8e142de195cd752f3c35aaca35cacaf6d7d6add71a34d4cd3eab597c8c04a8"
+PIN_COMMIT = "db3717cd0b2e2bc3ef542848582dc51238c7d768"
+PIN_SHA256 = "bb2b487c59826eefe075edc93cf3cb7ed56ae81c6efa09ac40afb25d3f51e6d9"
 SNAPSHOT_FILE = "ores-desktop-pinned-verifier.py"
 
 

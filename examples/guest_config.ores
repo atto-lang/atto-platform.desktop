@@ -1,9 +1,15 @@
-// Compilable scalar subset of oreslang-source.llvm. No guest main or host imports.
+// Compilable scalar subset of atto-source.llvm. No guest main or host imports.
+// One scalar function is used both internally and by a native desktop callback.
+pub fnc desktop_next_frame(int frame): int {
+    return frame + 1;
+}
+
 pub fnc desktop_initial_width(): int {
     return 800;
 }
+
 pub fnc desktop_initial_height(): int {
-    return 500;
+    return desktop_next_frame(499);
 }
 
 fnc desktop_unreachable_probe(): int {

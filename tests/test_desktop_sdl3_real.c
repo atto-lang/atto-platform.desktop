@@ -19,7 +19,7 @@ static void on_stop(void *ctx) { (void)ctx; ++stops; }
 static int one_run(void) {
     ores_desktop_sdl3_state state = {0};
     const ores_desktop_config config = {
-        ORES_DESKTOP_ABI_VERSION, 320, 240, 16, 2, "Oreslang SDL3 real smoke"
+        ORES_DESKTOP_ABI_VERSION, 320, 240, 16, 2, "AttoLang SDL3 real smoke", sizeof("AttoLang SDL3 real smoke") - 1u
     };
     const ores_desktop_app app = { NULL, NULL, NULL, on_frame, on_stop };
     const ores_desktop_backend backend = ores_desktop_sdl3_backend(&state);

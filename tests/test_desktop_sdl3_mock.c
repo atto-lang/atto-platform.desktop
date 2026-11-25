@@ -51,7 +51,7 @@ static ores_desktop_status start_app(void *x){
  if (app.probe_rival) {
    ores_desktop_sdl3_state rival={0};
    ores_desktop_backend b=ores_desktop_sdl3_backend(&rival);
-   ores_desktop_config cfg={ORES_DESKTOP_ABI_VERSION,320,240,2,1,"mock SDL3"};
+   ores_desktop_config cfg={ORES_DESKTOP_ABI_VERSION,320,240,2,1,"mock SDL3",9};
    CHECK(b.open(b.context,&cfg)==ORES_DESKTOP_BACKEND_ERROR);
    // Foreign close cannot clear current window's event-loop lease.
    b.close(b.context);
@@ -67,7 +67,7 @@ static ores_desktop_status frame_app(void *x,uint64_t frame){(void)x;CHECK(frame
 static void stop_app(void *x){(void)x;++app.stops;}
 static ores_desktop_status execute(ores_desktop_sdl3_state *s,unsigned frames){
  ores_desktop_backend b=ores_desktop_sdl3_backend(s);
- ores_desktop_config cfg={ORES_DESKTOP_ABI_VERSION,320,240,2,frames,"mock SDL3"};
+ ores_desktop_config cfg={ORES_DESKTOP_ABI_VERSION,320,240,2,frames,"mock SDL3",9};
  ores_desktop_app a={NULL,start_app,event_app,frame_app,stop_app};
  return ores_desktop_run(&cfg,&a,&b);
 }

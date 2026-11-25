@@ -46,7 +46,7 @@ printf 'ORES_DESKTOP_COMPILER_SHA256=%s\n' "$pinned_sha256"
   --tree-shake-root=desktop_initial_width \
   --tree-shake-root=desktop_initial_height \
   --tree-shake-root=desktop_next_frame \
-  --target=host "$root/examples/guest_config.ores" > "$work/guest.ll"
+  --target=host "$root/examples/guest_config.atto" > "$work/guest.ll"
 
 require_i64_signature() {
   local symbol="$1"

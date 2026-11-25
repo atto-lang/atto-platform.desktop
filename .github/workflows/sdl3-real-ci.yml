@@ -1,0 +1,58 @@
+name: SDL3 native desktop backend CI (not Oreslang guest)
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'include/**'
+      - 'tests/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/sdl3-real-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux-real-sdl3:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-26.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify immutable source checkout and tree identity
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse --verify HEAD)" = "$EXPECTED_HEAD"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          tree="$(git rev-parse --verify 'HEAD^{tree}')"
+          [[ "$tree" =~ ^[0-9a-f]{40}$ ]]
+          printf 'SDL3_SOURCE_IDENTITY head=%s tree=%s\n' "$EXPECTED_HEAD" "$tree"
+          echo "Native SDL3 host source: sha=$EXPECTED_HEAD tree=$tree" >> "$GITHUB_STEP_SUMMARY"
+      - name: Install distro packaged native SDL3 3.2+ headers and library
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build gcc libsdl3-dev pkg-config
+          pkg-config --modversion sdl3
+      - name: Build real SDL3 adapter and both mock and real host tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B "$RUNNER_TEMP/ores-desktop-sdl3-real" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON \
+            -DORES_DESKTOP_WITH_SDL3=ON
+          cmake --build "$RUNNER_TEMP/ores-desktop-sdl3-real" --parallel 2
+      - name: Execute CTest against actual SDL3 library and synthetic mock
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDL_VIDEODRIVER=dummy ctest \
+            --test-dir "$RUNNER_TEMP/ores-desktop-sdl3-real" --output-on-failure
+          echo 'REAL_SDL3_NATIVE_HOST_TESTS_EXECUTED (not Oreslang guest)'

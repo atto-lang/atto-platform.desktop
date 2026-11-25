@@ -18,7 +18,9 @@ typedef enum {
     ORES_DESKTOP_POINTER_MOVE=5, ORES_DESKTOP_POINTER_DOWN=6,
     ORES_DESKTOP_POINTER_UP=7
 } ores_desktop_event_type;
-/* In-process layout, not a wire protocol. key codes are backend scancodes. */
+/* In-process layout, not a wire protocol. key codes are backend scancodes.
+ * For RESIZE only, x/y are dimensions in [0,16384]; 0 means minimized.
+ * Other event coordinates may be outside the window. */
 typedef struct {
     uint32_t type, code;
     int32_t x, y;
@@ -26,7 +28,7 @@ typedef struct {
 typedef struct {
     uint32_t abi_version, width, height, max_events_per_frame;
     uint64_t frame_limit; /* 0 means unbounded */
-    const char *title;    /* borrowed exact bytes; host snapshots + terminates */
+    const char *title;    /* borrowed UTF-8 without controls; host snapshots + terminates */
     size_t title_length;  /* 1..127; source need not be NUL terminated */
 } ores_desktop_config;
 /* Borrowed callback event pointer expires on return. Return OK or STOP only.
@@ -48,10 +50,23 @@ typedef struct {
     void (*close)(void *);
 } ores_desktop_backend;
 uint32_t ores_desktop_abi_version(void);
+/* Pure validation of a single host/backend event; no callbacks or writes.
+ * Resize x/y are dimensions in [0,16384] (zero means minimized). Other
+ * coordinates are unconstrained signed 32-bit values. The host loop
+ * revalidates polled events independently of this preflight. */
+ores_desktop_status ores_desktop_validate_event(const ores_desktop_event *event);
+/* Validate host configuration without opening a native window or invoking
+ * callbacks. The title is inspected only for this call. A later run
+ * independently snapshots/validates it to avoid a stale preflight result.
+ * This is a host C ABI utility, not compiled-guest availability proof. */
+ores_desktop_status ores_desktop_validate_config(const ores_desktop_config *config);
 /* Single-threaded UI loop. Successful open always gets one close. */
 ores_desktop_status ores_desktop_run(const ores_desktop_config *,
                                     const ores_desktop_app *,
                                     const ores_desktop_backend *);
+/* Deterministic host-only defaults; returned title points to static immutable bytes. */
+ores_desktop_config ores_desktop_default_config(void);
+
 #ifdef __cplusplus
 }
 #endif

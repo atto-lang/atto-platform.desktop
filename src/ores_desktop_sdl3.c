@@ -1,7 +1,19 @@
 #include "ores_desktop_sdl3.h"
 #include <limits.h>
 #include <stddef.h>
+#include <stdatomic.h>
 #include <SDL3/SDL.h>
+
+/* SDL_PollEvent consumes a process-global queue. Until a central window
+ * dispatcher exists, multiple independent desktop loops cannot run safely.
+ * Gate ownership before SDL initialization and release on every exit path. */
+/* Static storage zero-initializes the atomic pointer; avoid the deprecated
+ * ATOMIC_VAR_INIT macro (removed by newer C library headers). */
+static _Atomic(ores_desktop_sdl3_state*) active_owner = NULL;
+static void release_owner(ores_desktop_sdl3_state *s) {
+    ores_desktop_sdl3_state *expected = s;
+    (void)atomic_compare_exchange_strong(&active_owner, &expected, NULL);
+}
 
 static int32_t coordinate(float v) {
     if (!(v == v)) return 0;
@@ -11,13 +23,20 @@ static int32_t coordinate(float v) {
 }
 static ores_desktop_status host_open(void *context,const ores_desktop_config *c) {
     ores_desktop_sdl3_state *s=(ores_desktop_sdl3_state*)context;
+    ores_desktop_sdl3_state *expected=NULL;
     if (!s || s->window || s->initialized) return ORES_DESKTOP_BACKEND_ERROR;
-    if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) return ORES_DESKTOP_BACKEND_ERROR;
+    if (!atomic_compare_exchange_strong(&active_owner, &expected, s))
+        return ORES_DESKTOP_BACKEND_ERROR;
+    if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) {
+        release_owner(s);
+        return ORES_DESKTOP_BACKEND_ERROR;
+    }
     s->initialized=1;
     s->window=SDL_CreateWindow(c->title,(int)c->width,(int)c->height,SDL_WINDOW_RESIZABLE);
     if (!s->window) {
         SDL_QuitSubSystem(SDL_INIT_VIDEO);
         s->initialized=0;
+        release_owner(s);
         return ORES_DESKTOP_BACKEND_ERROR;
     }
     return ORES_DESKTOP_OK;
@@ -30,6 +49,13 @@ static ores_desktop_status host_poll(void *context,ores_desktop_event *out,int *
     *has_event=0;
     /* Do not spin forever discarding unrelated SDL events. */
     for (n=0;n<64 && SDL_PollEvent(&ev);++n) {
+        /* SDL_PollEvent drains the process-wide queue. Never deliver another
+         * window's close, keyboard, pointer or resize events to this app.
+         * SDL_EVENT_QUIT is application-global and remains actionable.
+         * Multiple window hosts still require one shared event dispatcher. */
+        if (ev.type != SDL_EVENT_QUIT &&
+            SDL_GetWindowFromEvent(&ev) != (SDL_Window*)s->window)
+            continue;
         out->type=0; out->code=0; out->x=0; out->y=0;
         switch (ev.type) {
         case SDL_EVENT_QUIT:
@@ -67,11 +93,12 @@ static ores_desktop_status host_present(void *context) {
 }
 static void host_close(void *context) {
     ores_desktop_sdl3_state *s=(ores_desktop_sdl3_state*)context;
-    if (!s) return;
+    if (!s || atomic_load(&active_owner) != s) return;
     if (s->window) SDL_DestroyWindow((SDL_Window*)s->window);
     s->window=NULL;
     if (s->initialized) SDL_QuitSubSystem(SDL_INIT_VIDEO);
     s->initialized=0;
+    release_owner(s);
 }
 ores_desktop_backend ores_desktop_sdl3_backend(ores_desktop_sdl3_state *state) {
     ores_desktop_backend b={state,host_open,host_poll,host_present,host_close};

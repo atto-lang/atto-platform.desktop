@@ -1,0 +1,7 @@
+// Shared scalar admission floor for the desktop app manifest.
+// The value 1300 = width 800 + height 500. This file intentionally uses
+// only the single-function checked-i64 subset accepted by .NET bootstrap.
+// It is NOT an AttoLang desktop import, window creation, or GUI test.
+define pub fnc main() : int {
+    return 800 + 500;
+}

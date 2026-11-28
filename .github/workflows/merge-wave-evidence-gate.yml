@@ -1,0 +1,42 @@
+# Synthetic regression job only; it is NOT a required release/merge check.
+name: source-free merge-wave evidence regression (synthetic)
+on:
+  pull_request:
+    paths:
+      - 'scripts/merge_wave_evidence_gate.mjs'
+      - 'tests/merge_wave_evidence_gate.test.mjs'
+      - '.github/workflows/merge-wave-evidence-gate.yml'
+      - 'scripts/trusted_policy.py'
+      - 'scripts/test_trusted_policy*.py'
+      - 'scripts/source-local-admin-probe.sh'
+      - 'scripts/test_source_local_admin_probe.py'
+      - '.github/workflows/desktop-trusted-pr-metadata-policy.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-evidence-regressions:
+    if: github.repository == 'atto-lang/atto-platform.desktop'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Assert exact checkout head
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_HEAD" =~ ^[a-f0-9]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Run synthetic fail-closed evidence model
+        run: node --test tests/merge_wave_evidence_gate.test.mjs
+      - name: Run source-free Python policy and administrative diagnostic tests
+        run: |
+          set -euo pipefail
+          python3 -c 'import yaml'
+          python3 -m unittest discover -s scripts -p 'test_trusted_policy*.py' -v
+          python3 -m unittest discover -s scripts -p 'test_source_local_admin_probe.py' -v

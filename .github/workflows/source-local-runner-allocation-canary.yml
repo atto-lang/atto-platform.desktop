@@ -1,29 +1,55 @@
-# Source-free diagnostic only: no checkout, no repository file reads, no network fetches,
-# no source export, and no compiler/runtime/synthesis tests.
+# Source-free diagnostic only: no checkout, repository reads, network fetches,
+# source export, artifact upload, compiler tests, or runtime tests.
+# A successful step alone is not exact-head source execution evidence.
+# No path filtering: required check must trigger even on unrelated PR files.
 name: Source-local runner allocation canary (metadata only)
 on:
   pull_request:
-    paths:
-      - .github/workflows/source-local-runner-allocation-canary.yml
   workflow_dispatch:
 
 permissions: {}
 
 jobs:
   allocation-only:
+    if: github.repository == 'atto-lang/atto-platform.desktop'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Prove a GitHub-hosted runner executed
+      - name: Prove a GitHub-hosted runner executed without source access
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          test -n "${RUNNER_NAME:-}"
-          test -n "${RUNNER_OS:-}"
-          test -n "${GITHUB_RUN_ID:-}"
-          test -n "${GITHUB_RUN_ATTEMPT:-}"
-          test -n "${GITHUB_SHA:-}"
-          test "${GITHUB_REPOSITORY}" = 'atto-lang/atto-platform.desktop'
-          printf 'RUNNER_ALLOCATED repo=%s runner_os=%s run_id=%s sha=%s\n' \
-            "${GITHUB_REPOSITORY}" "${RUNNER_OS}" "${GITHUB_RUN_ID}" "${GITHUB_SHA}"
+          expected_repo='atto-lang/atto-platform.desktop'
+          [[ "${GITHUB_REPOSITORY:-}" == "$expected_repo" ]]
+          [[ "${EVENT_NAME:-}" == pull_request || "${EVENT_NAME:-}" == workflow_dispatch ]]
+          [[ -n "${RUNNER_NAME:-}" && -n "${RUNNER_OS:-}" && -n "${RUNNER_ARCH:-}" ]]
+          [[ "${GITHUB_RUN_ID:-}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${GITHUB_RUN_ATTEMPT:-}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${GITHUB_SHA:-}" =~ ^[0-9a-f]{40}$ ]]
+
+          case "$EVENT_NAME" in
+            pull_request)
+              [[ "${GITHUB_BASE_REF:-}" == main && -n "${GITHUB_HEAD_REF:-}" ]]
+              [[ "${PR_HEAD_SHA:-}" =~ ^[0-9a-f]{40}$ ]]
+              [[ "${PR_BASE_SHA:-}" =~ ^[0-9a-f]{40}$ ]]
+              source_kind=pr_head
+              source_sha="$PR_HEAD_SHA"
+              base_sha="$PR_BASE_SHA"
+              ;;
+            workflow_dispatch)
+              [[ -z "${PR_HEAD_SHA:-}" && -z "${PR_BASE_SHA:-}" ]]
+              source_kind=dispatch_ref
+              source_sha="$GITHUB_SHA"
+              base_sha=none
+              ;;
+          esac
+
+          printf 'RUNNER_EXECUTED repo=%s runner_name=%s runner_os=%s runner_arch=%s run_id=%s\n' \
+            "$GITHUB_REPOSITORY" "$RUNNER_NAME" "$RUNNER_OS" "$RUNNER_ARCH" "$GITHUB_RUN_ID"
+          printf 'SHA_CONTEXT event=%s source_kind=%s source_sha=%s event_sha=%s base_sha=%s\n' \
+            "$EVENT_NAME" "$source_kind" "$source_sha" "$GITHUB_SHA" "$base_sha"
           printf 'SOURCE_CHECKOUT=false SOURCE_EXPORT=false TESTS_EXECUTED=false\n'
